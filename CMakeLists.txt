@@ -23,6 +23,7 @@ include_directories(${OPENGL_INCLUDE_DIR})
 set(SOURCES
     src/main.cpp
     src/Canvas.cpp
+    src/ColorPicker.cpp
 )
 
 # Create executable
