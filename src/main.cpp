@@ -14,14 +14,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    static bool isDrawing = false;
     static Canvas* canvas = static_cast<Canvas*>(glfwGetWindowUserPointer(window));
 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
-            isDrawing = true;
+            canvas->startNewLine();
         } else if (action == GLFW_RELEASE) {
-            isDrawing = false;
+            canvas->endLine();
         }
     }
 }

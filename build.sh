@@ -90,6 +90,14 @@ run_project() {
     fi
 }
 
+# Build and run the project
+build_and_run() {
+    build_project
+    if [ $? -eq 0 ]; then
+        run_project
+    fi
+}
+
 # Clean the project
 clean_project() {
     print_message "Cleaning project..." "$YELLOW"
@@ -118,12 +126,16 @@ case "$1" in
         clean_project
         build_project
         ;;
+    "br"|"buildrun")
+        build_and_run
+        ;;
     *)
-        echo "Usage: $0 {build|run|clean|rebuild}"
+        echo "Usage: $0 {build|run|clean|rebuild|br}"
         echo "  build   - Build the project"
         echo "  run     - Run the project"
         echo "  clean   - Clean the build directory"
         echo "  rebuild - Clean and rebuild the project"
+        echo "  br      - Build and run the project"
         exit 1
         ;;
 esac 

@@ -4,6 +4,8 @@ Canvas::Canvas(unsigned int width, unsigned int height)
     : width(width), height(height), currentThickness(2.0f) {
     // Initialize current color to black
     currentColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    // Start with an empty line
+    startNewLine();
 }
 
 Canvas::~Canvas() {
@@ -17,15 +19,17 @@ void Canvas::draw() {
     glEnable(GL_LINE_SMOOTH);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 
-    // Draw all points
-    for (size_t i = 0; i < points.size(); i += 2) {
-        if (i + 1 < points.size()) {
-            glLineWidth(thicknesses[i/2]);
-            glBegin(GL_LINES);
-            glColor4fv(&colors[i*2]);
-            glVertex2f(points[i], points[i+1]);
-            if (i + 3 < points.size()) {
-                glVertex2f(points[i+2], points[i+3]);
+    // Draw each line segment separately
+    for (size_t i = 0; i < lineStarts.size(); ++i) {
+        size_t start = lineStarts[i];
+        size_t end = (i + 1 < lineStarts.size()) ? lineStarts[i + 1] : points.size();
+
+        if (end - start >= 2) {  // Need at least 2 points for a line
+            glLineWidth(thicknesses[start/2]);
+            glBegin(GL_LINE_STRIP);
+            for (size_t j = start; j < end; j += 2) {
+                glColor4fv(&colors[j*2]);
+                glVertex2f(points[j], points[j+1]);
             }
             glEnd();
         }
@@ -48,6 +52,8 @@ void Canvas::clear() {
     points.clear();
     colors.clear();
     thicknesses.clear();
+    lineStarts.clear();
+    startNewLine();  // Start a new empty line after clearing
 }
 
 void Canvas::setColor(const std::array<float, 4>& color) {
@@ -56,4 +62,12 @@ void Canvas::setColor(const std::array<float, 4>& color) {
 
 void Canvas::setThickness(float thickness) {
     currentThickness = thickness;
+}
+
+void Canvas::startNewLine() {
+    lineStarts.push_back(points.size());
+}
+
+void Canvas::endLine() {
+    // No need to do anything here, the next startNewLine() will handle it
 } 

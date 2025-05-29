@@ -80,3 +80,6 @@ external/
 *.bak
 *.backup
 *~ 
+
+
+Makefile
