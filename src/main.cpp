@@ -8,17 +8,25 @@ void error_callback(int error, const char* description) {
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    static Canvas* canvas = static_cast<Canvas*>(glfwGetWindowUserPointer(window));
+    
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+    // Add color picker toggle with 'C' key
+    else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
+        canvas->toggleColorPicker();
     }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     static Canvas* canvas = static_cast<Canvas*>(glfwGetWindowUserPointer(window));
+    double mouseX, mouseY;
+    glfwGetCursorPos(window, &mouseX, &mouseY);
 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
-            canvas->startNewLine();
+            canvas->handleMouseClick(mouseX, mouseY);
         } else if (action == GLFW_RELEASE) {
             canvas->endLine();
         }
@@ -29,8 +37,7 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     static Canvas* canvas = static_cast<Canvas*>(glfwGetWindowUserPointer(window));
 
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        std::array<float, 4> color = {0.0f, 0.0f, 0.0f, 1.0f}; // Black color
-        canvas->addPoint(xpos, ypos, color, 2.0f);
+        canvas->handleMouseDrag(xpos, ypos);
     }
 }
 
@@ -56,7 +63,7 @@ int main() {
     glfwMakeContextCurrent(window);
 
     // Create canvas
-    Canvas canvas(800, 600);
+    Canvas canvas(800, 600, window);
     glfwSetWindowUserPointer(window, &canvas);
 
     // Set callbacks

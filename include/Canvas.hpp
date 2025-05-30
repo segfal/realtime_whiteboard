@@ -3,10 +3,11 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <array>
+#include "ColorPicker.hpp"
 
 class Canvas {
 public:
-    Canvas(unsigned int width, unsigned int height);
+    Canvas(unsigned int width, unsigned int height, GLFWwindow* window);
     ~Canvas();
 
     void draw();
@@ -16,6 +17,12 @@ public:
     void setThickness(float thickness);
     void startNewLine();  // Call this when mouse button is pressed
     void endLine();       // Call this when mouse button is released
+    
+    // New methods for color picker interaction
+    void handleMouseClick(float mouseX, float mouseY);
+    void handleMouseDrag(float mouseX, float mouseY);
+    bool isColorPickerOpen() const;
+    void toggleColorPicker();
 
 private:
     unsigned int width;
@@ -26,4 +33,6 @@ private:
     std::vector<size_t> lineStarts;  // Indices where new lines start
     std::array<float, 4> currentColor;
     float currentThickness;
+    ColorPicker colorPicker;
+    bool isDrawing;
 }; 

@@ -15,6 +15,9 @@ class ColorPicker {
         bool isMouseOver(float mouseX, float mouseY) const;
         void handleMouseClick(float mouseX, float mouseY);
         void handleMouseDrag(float mouseX, float mouseY);
+        bool getIsOpen() const;
+        void setIsOpen(bool is_open);
+
 
     private:
         GLFWwindow* window;
@@ -22,6 +25,7 @@ class ColorPicker {
         std::vector<std::array<float, 4>> recentColors;
         int selectedColorIndex;
         bool isOpen;
+        
         float x, y, width, height;
         float colorBoxSize;
         float colorBoxSpacing;
