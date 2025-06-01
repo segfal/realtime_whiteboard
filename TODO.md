@@ -4,9 +4,9 @@
 1. Basic Drawing Tools
    - [x] Color selection
    - [x] Eraser tool
-   - [ ] Brush size adjustment
-   - [ ] Tool selection UI
-   - [ ] Undo/Redo functionality
+   - [x] Brush size adjustment
+   - [x] Tool selection UI
+   - [x] Undo/Redo functionality
 
 Learning Resources:
 - OpenGL Color Management: https://learnopengl.com/Advanced-OpenGL/Blending

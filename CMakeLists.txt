@@ -24,6 +24,7 @@ set(SOURCES
     src/main.cpp
     src/Canvas.cpp
     src/ColorPicker.cpp
+    src/Toolbar.cpp
 )
 
 # Create executable

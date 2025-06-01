@@ -1,3 +1,4 @@
+#define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <array>
@@ -23,6 +24,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     else if (key == GLFW_KEY_E && action == GLFW_PRESS) {
         canvas->setisEraser();
     }
+    // Undo: Cmd+Z or Ctrl+Z
+    else if ((key == GLFW_KEY_Z && action == GLFW_PRESS) && (mods & (GLFW_MOD_SUPER | GLFW_MOD_CONTROL))) {
+        canvas->undo();
+    }
+    // Redo: Cmd+Shift+Z or Ctrl+Y
+    else if (((key == GLFW_KEY_Z && action == GLFW_PRESS) && (mods & (GLFW_MOD_SUPER | GLFW_MOD_CONTROL) && (mods & GLFW_MOD_SHIFT))) ||
+             ((key == GLFW_KEY_Y && action == GLFW_PRESS) && (mods & (GLFW_MOD_SUPER | GLFW_MOD_CONTROL)))) {
+        canvas->redo();
+    }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
@@ -45,6 +55,14 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
         canvas->handleMouseDrag(xpos, ypos);
     }
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    static Canvas* canvas = static_cast<Canvas*>(glfwGetWindowUserPointer(window));
+    // yoffset is positive when scrolling up, negative when scrolling down
+    // We'll use this to increase/decrease brush size
+    float sizeChange = yoffset * 0.5f;  // Adjust this multiplier to control sensitivity
+    canvas->adjustThickness(sizeChange);
 }
 
 int main() {
@@ -76,6 +94,7 @@ int main() {
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetScrollCallback(window, scroll_callback);
 
     // Set up OpenGL viewport
     glViewport(0, 0, 800, 600);
