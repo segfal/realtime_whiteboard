@@ -17,6 +17,12 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     else if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         canvas->toggleColorPicker();
     }
+    else if (key == GLFW_KEY_B && action == GLFW_PRESS) {
+        canvas->toggleBackgroundColorPicker();
+    }
+    else if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+        canvas->setisEraser();
+    }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
@@ -25,7 +31,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     glfwGetCursorPos(window, &mouseX, &mouseY);
 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (action == GLFW_PRESS) {
+        if (action == GLFW_PRESS) { 
             canvas->handleMouseClick(mouseX, mouseY);
         } else if (action == GLFW_RELEASE) {
             canvas->endLine();

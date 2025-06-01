@@ -2,8 +2,8 @@
 
 ## Priority 1: Basic Drawing Features
 1. Basic Drawing Tools
-   - [ ] Color selection
-   - [ ] Eraser tool
+   - [x] Color selection
+   - [x] Eraser tool
    - [ ] Brush size adjustment
    - [ ] Tool selection UI
    - [ ] Undo/Redo functionality
