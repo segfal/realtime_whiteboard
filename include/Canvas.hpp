@@ -23,6 +23,11 @@ public:
     void handleMouseDrag(float mouseX, float mouseY);
     bool isColorPickerOpen() const;
     void toggleColorPicker();
+    bool getisEraser();
+    void setisEraser();
+    void setBackgroundColor(const std::array<float, 4>& color);
+    std::array<float, 4> getBackgroundColor() const;
+    void toggleBackgroundColorPicker();
 
 private:
     unsigned int width;
@@ -32,7 +37,11 @@ private:
     std::vector<float> thicknesses;
     std::vector<size_t> lineStarts;  // Indices where new lines start
     std::array<float, 4> currentColor;
+    std::array<float, 4> backgroundColor;
     float currentThickness;
     ColorPicker colorPicker;
+    ColorPicker backgroundColorPicker;
     bool isDrawing;
+    bool isEraserMode;
+    bool isBackgroundColorPickerOpen;
 }; 
