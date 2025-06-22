@@ -19,7 +19,13 @@ endif()
 # Find required packages
 add_subdirectory(external/glfw)
 find_package(OpenGL REQUIRED)
-find_package(nlohmann_json REQUIRED)
+
+# Try to find nlohmann_json, if not found, we'll use a bundled version
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found, will use bundled version")
+    add_subdirectory(external/json)
+endif()
 
 # GLAD: Place glad.c in external/glad/src and glad.h/khrplatform.h in external/glad/include
 file(GLOB GLAD_SOURCES ${CMAKE_SOURCE_DIR}/external/glad/src/glad.c)
@@ -38,19 +44,48 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/external/glad/include
     ${CMAKE_SOURCE_DIR}/external/glfw/include
-    /opt/homebrew/include
 )
+
+# Add nlohmann_json include if using bundled version
+if(NOT nlohmann_json_FOUND AND EXISTS ${CMAKE_SOURCE_DIR}/external/json/include)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/external/json/include
+    )
+endif()
+
+# macOS specific include
+if(APPLE)
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        /opt/homebrew/include
+    )
+endif()
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     OpenGL::GL
-    nlohmann_json::nlohmann_json
-    "-framework Cocoa"
-    "-framework OpenGL"
-    "-framework IOKit"
-    "-framework CoreVideo"
 )
+
+# Add nlohmann_json linking
+if(nlohmann_json_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        nlohmann_json::nlohmann_json
+    )
+elseif(EXISTS ${CMAKE_SOURCE_DIR}/external/json)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        nlohmann_json
+    )
+endif()
+
+# macOS specific frameworks
+if(APPLE)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        "-framework Cocoa"
+        "-framework OpenGL"
+        "-framework IOKit"
+        "-framework CoreVideo"
+    )
+endif()
 
 # Create resources directory if it doesn't exist
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/resources)
