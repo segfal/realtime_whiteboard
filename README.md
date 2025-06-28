@@ -1,68 +1,29 @@
-# Real-time Collaborative Whiteboard
+# Installation Guide
 
-A desktop application for real-time collaborative drawing and whiteboarding, built with C++ and modern graphics libraries.
+## Installation for client.
+- cd client
+- pnpm install
+- pnpm run dev
 
-## Features
 
-- 🎨 Real-time drawing with various tools (pen, eraser, shapes, text)
-- 👥 Multi-user collaboration via WebSocket
-- 💾 Export boards as PNG images
-- 🔗 Shareable board links
-- 💬 Built-in chat functionality
 
-## Dependencies
+## Tech Stack and Installed Libraries
 
-- SDL2 - Window management and input handling
-- Dear ImGui - User interface
-- Skia - Vector graphics engine
-- uWebSockets - WebSocket client
-- OpenGL - Graphics rendering
+- React (using Vite with SWC for fast builds)
+- pnpm as the package manager
 
-## Building from Source
+### UI / Drawing
+- react-colorful – lightweight color picker component
+- zustand – simple global state management
+- pixi.js – WebGL-based 2D renderer (optional fallback)
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/realtime_whiteboard.git
-cd realtime_whiteboard
-```
+### Realtime Collaboration (planned)
+- yjs – CRDT-based shared state
+- y-websocket – WebSocket connector for Yjs
 
-2. Run the setup script to clone dependencies:
-```bash
-./setup.sh
-```
+### Math & Graphics
+- gl-matrix – vector and matrix math for WebGL/WebGPU
 
-3. Create a build directory and run CMake:
-```bash
-mkdir build && cd build
-cmake ..
-make
-```
-
-4. Run the application:
-```bash
-./realtime_whiteboard
-```
-
-## Project Structure
-
-```
-src/
-├── core/       # Drawing model, tools, canvas logic
-├── ui/         # ImGui controls and interface
-├── net/        # WebSocket client and message handling
-├── platform/   # SDL2 & Skia bridge
-└── export/     # PNG + JSON saving functionality
-```
-
-## Development
-
-The project uses CMake as its build system. The main components are:
-
-- Canvas Engine (Skia)
-- UI System (Dear ImGui)
-- Networking (WebSockets)
-- Export System (PNG + JSON)
-
-## License
-
-MIT License - see LICENSE file for details 
+### Future Additions
+- C++ drawing engine compiled to WebAssembly (using Emscripten)
+- WebGL and WebGPU rendering support
