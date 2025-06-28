@@ -25,7 +25,7 @@ class Canvas {
         void swap_buffers();
         void poll_events();
         GLFWwindow* get_window() const;
-
+    private:
         // Snake case GLFW wrappers
         bool glfw_init();
         void glfw_terminate();

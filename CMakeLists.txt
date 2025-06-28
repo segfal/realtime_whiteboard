@@ -34,6 +34,8 @@ file(GLOB GLAD_SOURCES ${CMAKE_SOURCE_DIR}/external/glad/src/glad.c)
 file(GLOB_RECURSE SOURCES 
     "src/*.cpp"
     "src/*.h"
+    "src/components/*/*.cpp"
+    "src/components/*/*.h"
 )
 
 # Create executable
@@ -42,6 +44,7 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${GLAD_SOURCES})
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/components
     ${CMAKE_SOURCE_DIR}/external/glad/include
     ${CMAKE_SOURCE_DIR}/external/glfw/include
 )
