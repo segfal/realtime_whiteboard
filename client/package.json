@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:wasm": "cd wasm && ./build.sh",
+    "build:all": "pnpm run build:wasm && pnpm run build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "clean": "rm -rf wasm/build public/drawing_engine.js public/drawing_engine.wasm",
+    "setup": "pnpm run build:wasm && pnpm run dev"
   },
   "dependencies": {
     "react": "^19.1.0",
