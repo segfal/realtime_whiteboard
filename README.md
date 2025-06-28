@@ -1,69 +1,68 @@
-# Realtime Whiteboard
+# Real-time Collaborative Whiteboard
 
-A real-time whiteboard application built with C++17 and OpenGL, allowing users to draw and interact with a canvas in real-time.
+A desktop application for real-time collaborative drawing and whiteboarding, built with C++ and modern graphics libraries.
 
 ## Features
 
-- Real-time drawing capabilities using OpenGL
-- Smooth line rendering
-- Mouse-based drawing interface
-- Clean, modern architecture
+- 🎨 Real-time drawing with various tools (pen, eraser, shapes, text)
+- 👥 Multi-user collaboration via WebSocket
+- 💾 Export boards as PNG images
+- 🔗 Shareable board links
+- 💬 Built-in chat functionality
 
 ## Dependencies
 
-- C++17 compatible compiler
-- CMake (version 3.10 or higher)
-- OpenGL
-- GLFW 3.x
+- SDL2 - Window management and input handling
+- Dear ImGui - User interface
+- Skia - Vector graphics engine
+- uWebSockets - WebSocket client
+- OpenGL - Graphics rendering
 
-## Building the Project
+## Building from Source
 
-1. Install dependencies (macOS):
+1. Clone the repository:
 ```bash
-brew install glfw
+git clone https://github.com/yourusername/realtime_whiteboard.git
+cd realtime_whiteboard
 ```
 
-2. Create a build directory:
+2. Run the setup script to clone dependencies:
 ```bash
-mkdir build
-cd build
+./setup.sh
 ```
 
-3. Generate build files:
+3. Create a build directory and run CMake:
 ```bash
+mkdir build && cd build
 cmake ..
+make
 ```
 
-4. Build the project:
+4. Run the application:
 ```bash
-make
+./realtime_whiteboard
 ```
 
 ## Project Structure
 
 ```
-.
-├── CMakeLists.txt
-├── include/
-│   └── Canvas.hpp
-├── src/
-│   ├── Canvas.cpp
-│   └── main.cpp
-├── build.sh
-└── README.md
+src/
+├── core/       # Drawing model, tools, canvas logic
+├── ui/         # ImGui controls and interface
+├── net/        # WebSocket client and message handling
+├── platform/   # SDL2 & Skia bridge
+└── export/     # PNG + JSON saving functionality
 ```
 
-## Usage
+## Development
 
-After building, run the executable:
-```bash
-./RealtimeWhiteboard
-```
+The project uses CMake as its build system. The main components are:
 
-Controls:
-- Left mouse button: Draw
-- ESC: Exit application
+- Canvas Engine (Skia)
+- UI System (Dear ImGui)
+- Networking (WebSockets)
+- Export System (PNG + JSON)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT License - see LICENSE file for details 
