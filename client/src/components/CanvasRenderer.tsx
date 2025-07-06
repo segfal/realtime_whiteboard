@@ -9,6 +9,7 @@ interface CanvasRendererProps {
   height: number;
   color: string;
   lineWidth: number;
+  eraseMode: 'normal' | 'erase' | 'soft_erase';
   onDrawingStart?: () => void;
   onDrawingEnd?: () => void;
 }
@@ -24,6 +25,7 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
   height,
   color,
   lineWidth,
+  eraseMode,
   onDrawingStart,
   onDrawingEnd
 }) => {
@@ -39,6 +41,7 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
     setColor,
     setLineWidth,
     drawLine,
+    eraseLine,
     getDrawingBuffer,
     getStrokeBuffer,
     clearStrokeBuffer,
@@ -214,9 +217,12 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
     
     const lastPoint = lastPointRef.current;
     if (lastPoint) {
-      // Draw line using WebAssembly engine
-      drawLine(lastPoint.x, lastPoint.y, x, y);
-      
+      // Use eraseLine if in erase mode, otherwise drawLine
+      if (eraseMode === 'erase' || eraseMode === 'soft_erase') {
+        eraseLine(lastPoint.x, lastPoint.y, x, y);
+      } else {
+        drawLine(lastPoint.x, lastPoint.y, x, y);
+      }
       // Update canvas immediately for real-time feedback
       const ctx = ctxRef.current;
       if (ctx) {
@@ -225,10 +231,9 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
         ctx.lineTo(x, y);
         ctx.stroke();
       }
-      
       lastPointRef.current = { x, y };
     }
-  }, [isLoaded, drawLine]);
+  }, [isLoaded, drawLine, eraseLine, eraseMode]);
 
   /**
    * Handle mouse up event

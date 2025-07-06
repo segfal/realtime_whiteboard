@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { HexColorPicker } from "react-colorful"
 import { CanvasRenderer } from "./components/CanvasRenderer"
 import { useDrawingEngine } from "./hooks/useDrawingEngine"
+import EraseControls from "./components/EraseControls"
 
 /**
  * Color picker component with improved styling
@@ -105,6 +106,7 @@ const LineWidthSelector: React.FC<LineWidthSelectorProps> = ({ lineWidth, onChan
 interface WhiteboardProps {
   color: string;
   lineWidth: number;
+  eraseMode: 'normal' | 'erase' | 'soft_erase';
   onDrawingStart?: () => void;
   onDrawingEnd?: () => void;
 }
@@ -112,6 +114,7 @@ interface WhiteboardProps {
 const Whiteboard: React.FC<WhiteboardProps> = ({ 
   color, 
   lineWidth, 
+  eraseMode,
   onDrawingStart, 
   onDrawingEnd 
 }) => {
@@ -122,6 +125,7 @@ const Whiteboard: React.FC<WhiteboardProps> = ({
         height={768}
         color={color}
         lineWidth={lineWidth}
+        eraseMode={eraseMode}
         onDrawingStart={onDrawingStart}
         onDrawingEnd={onDrawingEnd}
       />
@@ -155,7 +159,8 @@ const App = () => {
     clear,
     undo: engineUndo,
     redo: engineRedo,
-    getCurrentStyle
+    getCurrentStyle,
+    eraseMode
   } = useDrawingEngine();
 
   /**
@@ -266,12 +271,14 @@ const App = () => {
         <div className="sidebar">
           <ColorPicker color={color} onChange={setColor} />
           <LineWidthSelector lineWidth={lineWidth} onChange={setLineWidth} />
+          <EraseControls />
         </div>
         
         <div className="main-content">
           <Whiteboard
             color={color}
             lineWidth={lineWidth}
+            eraseMode={eraseMode}
             onDrawingStart={handleDrawingStart}
             onDrawingEnd={handleDrawingEnd}
           />

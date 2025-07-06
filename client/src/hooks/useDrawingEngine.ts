@@ -21,6 +21,123 @@ function loadDrawingEngineScript(): Promise<void> {
 }
 
 /**
+ * Simple mock drawing engine for native Mac development
+ *
+ * This allows you to test the React UI without the WASM module.
+ * All methods just log actions to the console.
+ */
+class NativeDrawingEngineMock {
+  private eraseMode: 'normal' | 'erase' | 'soft_erase' = 'normal';
+  private eraseRadius: number = 10;
+  private eraseOpacity: number = 0.5;
+  private currentLayer: number = 0;
+  private layers: any[] = [{ visible: true, opacity: 1.0 }];
+
+  initialize(width: number, height: number) {
+    console.log(`[NativeDrawingEngineMock] initialize(${width}, ${height})`);
+    return true;
+  }
+  
+  drawLine(x1: number, y1: number, x2: number, y2: number) {
+    if (this.eraseMode === 'normal') {
+      console.log(`[NativeDrawingEngineMock] drawLine(${x1}, ${y1}, ${x2}, ${y2})`);
+    } else {
+      console.log(`[NativeDrawingEngineMock] eraseLine(${x1}, ${y1}, ${x2}, ${y2}) - mode: ${this.eraseMode}`);
+    }
+  }
+  
+  drawRectangle(x: number, y: number, width: number, height: number) {
+    console.log(`[NativeDrawingEngineMock] drawRectangle(${x}, ${y}, ${width}, ${height})`);
+  }
+  
+  drawCircle(centerX: number, centerY: number, radius: number) {
+    console.log(`[NativeDrawingEngineMock] drawCircle(${centerX}, ${centerY}, ${radius})`);
+  }
+  
+  clear(r: number, g: number, b: number, a: number) {
+    console.log(`[NativeDrawingEngineMock] clear(${r}, ${g}, ${b}, ${a})`);
+  }
+
+  // Erase functionality
+  setEraseMode(mode: 'normal' | 'erase' | 'soft_erase') {
+    this.eraseMode = mode;
+    console.log(`[NativeDrawingEngineMock] setEraseMode(${mode})`);
+  }
+
+  getEraseMode() {
+    return this.eraseMode;
+  }
+
+  setEraseRadius(radius: number) {
+    this.eraseRadius = radius;
+    console.log(`[NativeDrawingEngineMock] setEraseRadius(${radius})`);
+  }
+
+  getEraseRadius() {
+    return this.eraseRadius;
+  }
+
+  setEraseOpacity(opacity: number) {
+    this.eraseOpacity = Math.max(0, Math.min(1, opacity));
+    console.log(`[NativeDrawingEngineMock] setEraseOpacity(${this.eraseOpacity})`);
+  }
+
+  getEraseOpacity() {
+    return this.eraseOpacity;
+  }
+
+  eraseAt(x: number, y: number) {
+    console.log(`[NativeDrawingEngineMock] eraseAt(${x}, ${y}) - radius: ${this.eraseRadius}, mode: ${this.eraseMode}`);
+  }
+
+  // Layer management
+  addLayer() {
+    this.layers.push({ visible: true, opacity: 1.0 });
+    this.currentLayer = this.layers.length - 1;
+    console.log(`[NativeDrawingEngineMock] addLayer() - total layers: ${this.layers.length}`);
+  }
+
+  removeLayer() {
+    if (this.layers.length > 1) {
+      this.layers.splice(this.currentLayer, 1);
+      this.currentLayer = Math.max(0, this.currentLayer - 1);
+      console.log(`[NativeDrawingEngineMock] removeLayer() - current layer: ${this.currentLayer}`);
+    } else {
+      console.log(`[NativeDrawingEngineMock] removeLayer() - cannot remove last layer`);
+    }
+  }
+
+  setCurrentLayer(layerIndex: number) {
+    if (layerIndex >= 0 && layerIndex < this.layers.length) {
+      this.currentLayer = layerIndex;
+      console.log(`[NativeDrawingEngineMock] setCurrentLayer(${layerIndex})`);
+    }
+  }
+
+  getCurrentLayer() {
+    return this.currentLayer;
+  }
+
+  getLayerCount() {
+    return this.layers.length;
+  }
+
+  clearAllLayers() {
+    this.layers = [{ visible: true, opacity: 1.0 }];
+    this.currentLayer = 0;
+    console.log(`[NativeDrawingEngineMock] clearAllLayers()`);
+  }
+}
+
+/**
+ * Detect if we are running in a browser with WASM support
+ */
+function isWasmAvailable() {
+  // This checks if the WASM loader function is present
+  return typeof window !== 'undefined' && typeof window.createDrawingEngineModule === 'function';
+}
+
+/**
  * Custom hook for managing the WebAssembly drawing engine
  * 
  * This hook provides a clean interface for React components to interact
@@ -31,29 +148,45 @@ export const useDrawingEngine = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const moduleRef = useRef<DrawingEngineModule.DrawingEngineInstance | null>(null);
-  const engineRef = useRef<DrawingEngineModule.DrawingEngine | null>(null);
+  // Erase state
+  const [eraseMode, setEraseMode] = useState<'normal' | 'erase' | 'soft_erase'>('normal');
+  const [eraseRadius, setEraseRadius] = useState(10);
+  const [eraseOpacity, setEraseOpacity] = useState(0.5);
+  const [currentLayer, setCurrentLayer] = useState(0);
+  const [layerCount, setLayerCount] = useState(1);
+
+  const moduleRef = useRef<any>(null);
+  const engineRef = useRef<any>(null);
 
   /**
-   * Initialize the WebAssembly module
+   * Initialize the drawing engine (WASM or native mock)
    */
   const initializeModule = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
-      // Load the WASM loader script
-      await loadDrawingEngineScript();
 
-      // Use the global function exposed by the script
-      const createDrawingEngineModule = window.createDrawingEngineModule;
-      const module = await createDrawingEngineModule();
-      moduleRef.current = module;
-      
-      // Create a new drawing engine instance
-      engineRef.current = new module.DrawingEngine();
-      
-      setIsLoaded(true);
+      // Try to load WASM if available
+      let useWasm = false;
+      try {
+        await loadDrawingEngineScript();
+        useWasm = isWasmAvailable();
+      } catch {
+        useWasm = false;
+      }
+
+      if (useWasm) {
+        // Use the WASM module (browser)
+        const createDrawingEngineModule = window.createDrawingEngineModule;
+        const module = await createDrawingEngineModule();
+        moduleRef.current = module;
+        engineRef.current = new module.DrawingEngine();
+        setIsLoaded(true);
+      } else {
+        // Use the native mock (Mac/local dev)
+        engineRef.current = new NativeDrawingEngineMock();
+        setIsLoaded(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load drawing engine');
       console.error('Failed to initialize drawing engine:', err);
@@ -302,6 +435,143 @@ export const useDrawingEngine = () => {
     }
   }, []);
 
+  /**
+   * Set the erase mode
+   * @param mode The erase mode: 'normal', 'erase', or 'soft_erase'
+   */
+  const setEraseModeHandler = useCallback((mode: 'normal' | 'erase' | 'soft_erase') => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.setEraseMode(mode);
+      setEraseMode(mode);
+    } catch (err) {
+      console.error('Failed to set erase mode:', err);
+    }
+  }, []);
+
+  /**
+   * Set the erase radius
+   * @param radius Radius in pixels
+   */
+  const setEraseRadiusHandler = useCallback((radius: number) => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.setEraseRadius(radius);
+      setEraseRadius(radius);
+    } catch (err) {
+      console.error('Failed to set erase radius:', err);
+    }
+  }, []);
+
+  /**
+   * Set the erase opacity (for soft erase)
+   * @param opacity Opacity value (0.0 to 1.0)
+   */
+  const setEraseOpacityHandler = useCallback((opacity: number) => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.setEraseOpacity(opacity);
+      setEraseOpacity(opacity);
+    } catch (err) {
+      console.error('Failed to set erase opacity:', err);
+    }
+  }, []);
+
+  /**
+   * Erase at a specific point
+   * @param x X coordinate
+   * @param y Y coordinate
+   */
+  const eraseAt = useCallback((x: number, y: number) => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.eraseAt(x, y);
+    } catch (err) {
+      console.error('Failed to erase at point:', err);
+    }
+  }, []);
+
+  /**
+   * Erase along a line
+   * @param x1 Start X coordinate
+   * @param y1 Start Y coordinate
+   * @param x2 End X coordinate
+   * @param y2 End Y coordinate
+   */
+  const eraseLine = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.eraseLine(x1, y1, x2, y2);
+    } catch (err) {
+      console.error('Failed to erase line:', err);
+    }
+  }, []);
+
+  /**
+   * Add a new layer
+   */
+  const addLayer = useCallback(() => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.addLayer();
+      setLayerCount(engineRef.current.getLayerCount());
+      setCurrentLayer(engineRef.current.getCurrentLayer());
+    } catch (err) {
+      console.error('Failed to add layer:', err);
+    }
+  }, []);
+
+  /**
+   * Remove the current layer
+   */
+  const removeLayer = useCallback(() => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.removeLayer();
+      setLayerCount(engineRef.current.getLayerCount());
+      setCurrentLayer(engineRef.current.getCurrentLayer());
+    } catch (err) {
+      console.error('Failed to remove layer:', err);
+    }
+  }, []);
+
+  /**
+   * Set the current layer
+   * @param layerIndex Layer index
+   */
+  const setCurrentLayerHandler = useCallback((layerIndex: number) => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.setCurrentLayer(layerIndex);
+      setCurrentLayer(layerIndex);
+    } catch (err) {
+      console.error('Failed to set current layer:', err);
+    }
+  }, []);
+
+  /**
+   * Clear all layers
+   */
+  const clearAllLayers = useCallback(() => {
+    if (!engineRef.current) return;
+    
+    try {
+      engineRef.current.clearAllLayers();
+      setLayerCount(engineRef.current.getLayerCount());
+      setCurrentLayer(engineRef.current.getCurrentLayer());
+    } catch (err) {
+      console.error('Failed to clear all layers:', err);
+    }
+  }, []);
+
   // Initialize the module on mount
   useEffect(() => {
     initializeModule();
@@ -346,6 +616,26 @@ export const useDrawingEngine = () => {
     
     // Utility
     getCurrentStyle,
+    
+    // Erase functionality
+    eraseMode,
+    eraseRadius,
+    eraseOpacity,
+    currentLayer,
+    layerCount,
+    
+    // Erase methods
+    setEraseMode: setEraseModeHandler,
+    setEraseRadius: setEraseRadiusHandler,
+    setEraseOpacity: setEraseOpacityHandler,
+    eraseAt,
+    eraseLine,
+    
+    // Layer management
+    addLayer,
+    removeLayer,
+    setCurrentLayer: setCurrentLayerHandler,
+    clearAllLayers,
     
     // Reinitialize
     reinitialize: initializeModule
