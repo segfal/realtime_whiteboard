@@ -1,0 +1,1 @@
+g++ -std=c++17 -I/opt/homebrew/Cellar/glm/1.0.1/include -o test test.cpp

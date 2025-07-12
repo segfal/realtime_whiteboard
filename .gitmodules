@@ -1,0 +1,15 @@
+[submodule "backend/includes/backend/glm"]
+	path = backend/includes/backend/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "backend/glm"]
+	path = backend/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "backend/emsdk"]
+	path = backend/emsdk
+	url = https://github.com/emscripten-core/emsdk.git
+[submodule "backend/gpuweb"]
+	path = backend/gpuweb
+	url = https://github.com/gpuweb/gpuweb.git
+[submodule "backend/SDL"]
+	path = backend/SDL
+	url = https://github.com/libsdl-org/SDL.git
