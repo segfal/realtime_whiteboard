@@ -7,6 +7,3 @@
 [submodule "backend/gpuweb"]
 	path = backend/gpuweb
 	url = https://github.com/gpuweb/gpuweb.git
-[submodule "backend/SDL"]
-	path = backend/SDL
-	url = https://github.com/libsdl-org/SDL.git
