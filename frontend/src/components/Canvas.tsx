@@ -1,15 +1,42 @@
 import { useRef, useState, useEffect } from 'react'
+import { useWASM } from '../hooks/useWasm'
+import { drawingEngine } from '../wasm/drawingEngine'
+import type { WASMStroke, WASMPoint, WASMColor } from '../types/wasm'
 
 type Point = { x: number; y: number }
 type Stroke = { points: Point[]; color: string; thickness: number }
 
+
+
+// TODO: Fix the WASM engine to be able to handle the last point of the stroke
+// CHECK WHY WASM ENGINE IS NOT UPDATING THE STROKES WHEN THE POINT IS ADDED
+
+// Helper function to convert hex color to WASM color
+const hexToWasmColor = (hex: string): WASMColor => {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  return { r, g, b, a: 1 }
+}
+
+// Helper function to convert WASM stroke to React stroke
+const wasmStrokeToReact = (wasmStroke: WASMStroke): Stroke => {
+  return {
+    points: wasmStroke.points,
+    color: `rgb(${Math.round(wasmStroke.color.r * 255)}, ${Math.round(wasmStroke.color.g * 255)}, ${Math.round(wasmStroke.color.b * 255)})`,
+    thickness: wasmStroke.thickness
+  }
+}
+
 export const Canvas = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { drawingEngine, isLoaded, error } = useWASM()
+  
+  // Keep React state for UI-only features
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null)
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const [currentColor, setCurrentColor] = useState<string>("#000000")
   const [currentThickness, setCurrentThickness] = useState<number>(2)
-  // Add 'erase' to the tool state
   const [tool, setTool] = useState<"draw" | "select" | "erase">("draw")
   const [selectionStart, setSelectionStart] = useState<Point | null>(null)
   const [selectionEnd, setSelectionEnd] = useState<Point | null>(null)
@@ -18,16 +45,26 @@ export const Canvas = () => {
   const [dragStart, setDragStart] = useState<Point | null>(null)
   const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png')
 
-  // Helper: Check if a point is inside a rectangle
+  // Sync strokes from WASM to React state
+  useEffect(() => {
+    if (!isLoaded) return; // Don't call WASM until loaded
+    try {
+      const wasmStrokes = drawingEngine.getStrokes()
+      const reactStrokes = wasmStrokes.map(wasmStrokeToReact)
+      setStrokes(reactStrokes)
+    } catch (err) {
+      console.error('Failed to get strokes from WASM:', err)
+    }
+  }, [isLoaded, drawingEngine])
+
+  // Helper functions (keep existing ones)
   const isPointInRect = (pt: Point, x1: number, y1: number, x2: number, y2: number) =>
     pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2
 
-  // Helper: Check if a point is near a stroke (for erasing)
   const isPointNearStroke = (pt: Point, stroke: Stroke, threshold = 8) => {
     for (let i = 0; i < stroke.points.length - 1; i++) {
       const a = stroke.points[i]
       const b = stroke.points[i + 1]
-      // Distance from pt to segment ab
       const dx = b.x - a.x
       const dy = b.y - a.y
       const lengthSq = dx * dx + dy * dy
@@ -44,34 +81,34 @@ export const Canvas = () => {
     return false
   }
 
-  // Mouse events
+  // Updated mouse events to use WASM
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isLoaded) return
+    
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
+    
     if (tool === "erase") {
-      // On eraser down, remove any stroke near the pointer
-      setStrokes(strokes =>
-        strokes.filter(stroke => !isPointNearStroke(mouse, stroke))
-      )
+      // Find and remove strokes near the pointer
+      const wasmStrokes = drawingEngine.getStrokes()
+      for (let i = wasmStrokes.length - 1; i >= 0; i--) {
+        const stroke = wasmStrokes[i]
+        const reactStroke = wasmStrokeToReact(stroke)
+        if (isPointNearStroke(mouse, reactStroke)) {
+          drawingEngine.removeStroke(i)
+          break
+        }
+      }
       return
     }
+    
     if (tool === "select") {
-      // If already have a selection and click inside it, start dragging
-      if (
-        selectedStrokes.size > 0 &&
-        selectionStart == null &&
-        selectionEnd == null
-      ) {
-        // Check if click is inside any selected stroke's bounding box
+      // Keep existing select logic for now
+      if (selectedStrokes.size > 0 && selectionStart == null && selectionEnd == null) {
         let inside = false
         strokes.forEach((stroke, i) => {
           if (selectedStrokes.has(i)) {
             for (const pt of stroke.points) {
-              if (
-                isPointInRect(
-                  mouse,
-                  pt.x - 5, pt.y - 5, pt.x + 5, pt.y + 5 // small area around point
-                )
-              ) {
+              if (isPointInRect(mouse, pt.x - 5, pt.y - 5, pt.x + 5, pt.y + 5)) {
                 inside = true
                 break
               }
@@ -84,12 +121,21 @@ export const Canvas = () => {
           return
         }
       }
-      // Otherwise, start a new selection rectangle
       setSelectionStart(mouse)
       setSelectionEnd(null)
       setIsDragging(false)
       setDragStart(null)
     } else {
+      // Start new stroke in WASM
+      const wasmColor = hexToWasmColor(currentColor)
+      const wasmStroke: WASMStroke = {
+        points: [mouse],
+        color: wasmColor,
+        thickness: currentThickness
+      }
+      drawingEngine.addStroke(wasmStroke)
+      
+      // Also keep in React state for immediate UI feedback
       setCurrentStroke({
         points: [mouse],
         color: currentColor,
@@ -99,37 +145,40 @@ export const Canvas = () => {
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isLoaded) return
+    
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
+    
     if (tool === "erase" && e.buttons) {
-      // On eraser drag, remove any stroke near the pointer
-      setStrokes(strokes =>
-        strokes.filter(stroke => !isPointNearStroke(mouse, stroke))
-      )
+      const wasmStrokes = drawingEngine.getStrokes()
+      for (let i = wasmStrokes.length - 1; i >= 0; i--) {
+        const stroke = wasmStrokes[i]
+        const reactStroke = wasmStrokeToReact(stroke)
+        if (isPointNearStroke(mouse, reactStroke)) {
+          drawingEngine.removeStroke(i)
+          break
+        }
+      }
       return
     }
+    
     if (tool === "select") {
       if (isDragging && dragStart) {
-        // Calculate offset
         const dx = mouse.x - dragStart.x
         const dy = mouse.y - dragStart.y
-        setStrokes(strokes =>
-          strokes.map((stroke, i) =>
-            selectedStrokes.has(i)
-              ? {
-                  ...stroke,
-                  points: stroke.points.map(pt => ({
-                    x: pt.x + dx,
-                    y: pt.y + dy
-                  }))
-                }
-              : stroke
-          )
-        )
+        selectedStrokes.forEach(index => {
+          drawingEngine.moveStroke(index, dx, dy)
+        })
         setDragStart(mouse)
       } else if (selectionStart) {
         setSelectionEnd(mouse)
       }
     } else if (currentStroke) {
+      // Add point to current stroke in WASM
+      const strokeIndex = drawingEngine.getStrokes().length - 1
+      drawingEngine.addPointToStroke(strokeIndex, mouse)
+      
+      // Update React state for immediate feedback
       setCurrentStroke({
         points: [...currentStroke.points, mouse],
         color: currentStroke.color,
@@ -141,30 +190,60 @@ export const Canvas = () => {
   const handlePointerUp = () => {
     if (tool === "select") {
       if (isDragging) {
-        setIsDragging(false)
-        setDragStart(null)
+        setIsDragging(false);
+        setDragStart(null);
       } else if (selectionStart && selectionEnd) {
-        // Calculate selection rectangle
-        const x1 = Math.min(selectionStart.x, selectionEnd.x)
-        const y1 = Math.min(selectionStart.y, selectionEnd.y)
-        const x2 = Math.max(selectionStart.x, selectionEnd.x)
-        const y2 = Math.max(selectionStart.y, selectionEnd.y)
-        // Find strokes with any point inside the rectangle
-        const selected = new Set<number>()
-        strokes.forEach((stroke, i) => {
-          if (stroke.points.some(pt => isPointInRect(pt, x1, y1, x2, y2))) {
-            selected.add(i)
+        const x1 = Math.min(selectionStart.x, selectionEnd.x);
+        const y1 = Math.min(selectionStart.y, selectionEnd.y);
+        const x2 = Math.max(selectionStart.x, selectionEnd.x);
+        const y2 = Math.max(selectionStart.y, selectionEnd.y);
+
+        const selected = new Set<number>();
+        const wasmStrokes = drawingEngine.getStrokes();
+        wasmStrokes.forEach((stroke, i) => {
+          if (stroke.points.some(pt => pt && isPointInRect(pt, x1, y1, x2, y2))) {
+            selected.add(i);
           }
-        })
-        setSelectedStrokes(selected)
-        setSelectionStart(null)
-        setSelectionEnd(null)
+        });
+        setSelectedStrokes(selected);
+        setSelectionStart(null);
+        setSelectionEnd(null);
       }
     } else if (currentStroke && currentStroke.points.length > 0) {
-      setStrokes(prev => [...prev, currentStroke])
-      setCurrentStroke(null)
+      // --- PATCH START ---
+      // Ensure the last point is added to the WASM stroke
+      const wasmStrokes = drawingEngine.getStrokes();
+      const strokeIndex = wasmStrokes.length - 1;
+      const lastPoint = currentStroke.points[currentStroke.points.length - 1];
+
+      if (
+        wasmStrokes[strokeIndex] &&
+        Array.isArray(wasmStrokes[strokeIndex].points) &&
+        (
+          wasmStrokes[strokeIndex].points.length === 0 ||
+          (
+            wasmStrokes[strokeIndex].points[wasmStrokes[strokeIndex].points.length - 1] &&
+            (
+              wasmStrokes[strokeIndex].points[wasmStrokes[strokeIndex].points.length - 1].x !== lastPoint.x ||
+              wasmStrokes[strokeIndex].points[wasmStrokes[strokeIndex].points.length - 1].y !== lastPoint.y
+            )
+          )
+        )
+      ) {
+        drawingEngine.addPointToStroke(strokeIndex, lastPoint);
+      }
+      // --- PATCH END ---
+
+      setCurrentStroke(null);
+
+      // Re-fetch strokes from WASM to update the UI
+      if (isLoaded) {
+        const updatedStrokes = drawingEngine.getStrokes();
+        const reactStrokes = updatedStrokes.map(wasmStrokeToReact);
+        setStrokes(reactStrokes);
+      }
     }
-  }
+  };
 
   const handleExport = () => {
     const canvas = canvasRef.current
@@ -210,12 +289,19 @@ export const Canvas = () => {
 
     // Draw all strokes (highlight selected)
     strokes.forEach((stroke, i) => {
+      if (!stroke.points || stroke.points.length === 0) return;
       ctx.save()
       ctx.strokeStyle = selectedStrokes.has(i) ? "rgba(0, 255, 0, 0.8)" : stroke.color
       ctx.lineWidth = stroke.thickness
       ctx.beginPath()
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y)
-      stroke.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
+      if (stroke.points[0] && typeof stroke.points[0].x === 'number' && typeof stroke.points[0].y === 'number') {
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y)
+        stroke.points.forEach(pt => {
+          if (pt && typeof pt.x === 'number' && typeof pt.y === 'number') {
+            ctx.lineTo(pt.x, pt.y)
+          }
+        })
+      }
       ctx.stroke()
       ctx.restore()
     })
@@ -247,6 +333,14 @@ export const Canvas = () => {
       ctx.restore()
     }
   }, [strokes, currentStroke, tool, selectionStart, selectionEnd, selectedStrokes])
+
+  if (error) {
+    return <div>Error loading WASM: {error}</div>
+  }
+
+  if (!isLoaded) {
+    return <div>Loading WASM...</div>
+  }
 
   return (
     <>
@@ -290,6 +384,12 @@ export const Canvas = () => {
           Delete Selected
         </button>
         <button onClick={handleExport}>Save</button>
+        <button onClick={() => {
+          if (drawingEngine) {
+            drawingEngine.clear()
+            setSelectedStrokes(new Set())
+          }
+        }}>Clear All</button>
       </div>
       <canvas
         ref={canvasRef}

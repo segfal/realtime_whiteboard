@@ -5,13 +5,24 @@
 # source ../emsdk/emsdk_env.sh
 
 emcc -std=c++17 \
-     -I../glm \
-     -I../src \
+     -Iglm \
+     -Isrc \
+     -Isrc/implement \
      -s USE_WEBGPU=1 \
      -s ALLOW_MEMORY_GROWTH=1 \
      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
-     -s EXPORTED_FUNCTIONS='["_main"]' \
+     -s MODULARIZE=1 \
+     -s EXPORT_NAME="DrawingEngineModule" \
      -O2 \
-     ../src/emscripten_bindings.cpp \
-     ../src/webgpu_drawing.cpp \
-     -o ../build/drawing_engine.js 
+     --bind \
+     src/bindings.cpp \
+     src/implement/DrawingEngine/DrawingEngine.cpp \
+     -o build/drawing_engine.js
+
+# Copy to frontend/public if build succeeded
+if [ $? -eq 0 ]; then
+  cp build/drawing_engine.* ../frontend/public/
+  echo "Copied build/drawing_engine.* to ../frontend/public/"
+else
+  echo "Build failed, not copying files."
+fi
