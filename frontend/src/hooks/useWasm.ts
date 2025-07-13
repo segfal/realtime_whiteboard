@@ -9,7 +9,14 @@ export const useWASM = () => {
     const loadWASM = async () => {
       try {
         await drawingEngine.loadWASM();
-        setIsLoaded(true);
+        // Add a small delay to ensure the engine is fully ready
+        setTimeout(() => {
+          if (drawingEngine.isReady()) {
+            setIsLoaded(true);
+          } else {
+            setError('Engine not ready after loading');
+          }
+        }, 100);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load WASM');
       }

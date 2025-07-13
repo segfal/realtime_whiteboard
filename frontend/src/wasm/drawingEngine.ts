@@ -77,7 +77,20 @@ class DrawingEngineBridge {
         if (typeof strokesVec.size === 'function' && typeof strokesVec.get === 'function') {
             const arr = [];
             for (let i = 0; i < strokesVec.size(); i++) {
-                arr.push(strokesVec.get(i));
+                const stroke = strokesVec.get(i);
+                // Convert ClassHandle points to plain objects
+                const points = [];
+                if (stroke.points && typeof stroke.points.size === 'function') {
+                    for (let j = 0; j < stroke.points.size(); j++) {
+                        const point = stroke.points.get(j);
+                        points.push({ x: point.x, y: point.y });
+                    }
+                }
+                arr.push({
+                    points: points,
+                    color: stroke.color,
+                    thickness: stroke.thickness
+                });
             }
             return arr;
         }
