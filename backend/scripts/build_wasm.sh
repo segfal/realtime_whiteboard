@@ -13,7 +13,7 @@ emcc -std=c++17 \
      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
      -s MODULARIZE=1 \
      -s EXPORT_NAME="DrawingEngineModule" \
-     -O2 \
+     -g \
      --bind \
      src/bindings.cpp \
      src/implement/DrawingEngine/DrawingEngine.cpp \
