@@ -1,0 +1,14 @@
+
+# Test logs and outputs
+test_logs/
+test_results_*.txt
+test_strokes
+
+# Debug files
+debug_results_*.txt
+stroke_debug
+stroke_debug.dSYM/
+test_strokes.dSYM/
+src/debug_main.cpp
+run_tests.py
+README_TESTING.md

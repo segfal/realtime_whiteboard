@@ -1,9 +1,9 @@
 #include <emscripten/bind.h>
 #include "./implement/DrawingEngine/DrawingEngine.hpp"
-
+#include "./implement/shape.hpp"
+#include "./implement/stroke_shape.hpp"
 
 using namespace emscripten;
-
 
 EMSCRIPTEN_BINDINGS(drawing_module) {
     // Color bindings
@@ -18,32 +18,35 @@ EMSCRIPTEN_BINDINGS(drawing_module) {
     .field("x", &Point::x)
     .field("y", &Point::y);
 
+    // ShapeType enum
+    enum_<ShapeType>("ShapeType")
+    .value("Stroke", ShapeType::Stroke)
+    .value("Rectangle", ShapeType::Rectangle)
+    .value("Ellipse", ShapeType::Ellipse);
 
-     // Stroke Bindings
-     value_object<Stroke>("Stroke")
-     .field("points", &Stroke::points)
-     .field("color", &Stroke::color)
-     .field("thickness", &Stroke::thickness);
-
-
-
-
+    // StrokeShape bindings
+    class_<StrokeShape>("StrokeShape")
+        .constructor<const Color&, float>()
+        .constructor<const Color&, float, const std::vector<Point>&>()
+        .property("points", &StrokeShape::points)
+        .function("getColor", &StrokeShape::getColor)
+        .function("getThickness", &StrokeShape::getThickness);
 
     // Binding stroke and point vectors
     register_vector<Point>("PointVector");
-    register_vector<Stroke>("StrokeVector");
-
+    register_vector<StrokeShape>("StrokeVector");
 
     // Draw engine Binding
     class_<DrawingEngine>("DrawingEngine")
         .constructor<>()
+        .function("addShape", &DrawingEngine::addShape)
         .function("addStroke", &DrawingEngine::addStroke)
         .function("addPointToStroke", &DrawingEngine::addPointToStroke)
+        .function("removeShape", &DrawingEngine::removeShape)
         .function("removeStroke", &DrawingEngine::removeStroke)
+        .function("moveShape", &DrawingEngine::moveShape)
         .function("moveStroke", &DrawingEngine::moveStroke)
         .function("clear", &DrawingEngine::clear)
         .function("getStrokes", &DrawingEngine::getStrokes)
         .function("getVertexBufferData", &DrawingEngine::getVertexBufferData);
-
-
 }

@@ -1,45 +1,43 @@
 
-import { useEffect, useRef, useState } from 'react'
-
-interface WebGPUState {
-  adapter: GPUAdapter | null
-  device: GPUDevice | null
-  context: GPUCanvasContext | null
-  format: GPUTextureFormat | null
-}
+import { useEffect, useState } from 'react'
+import type { WebGPUState } from '../types/webgpu'
 
 export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
-  const [webGPUState, setWebGPUState] = useState<WebGPUState>({
+  const [state, setState] = useState<WebGPUState>({
     adapter: null,
     device: null,
     context: null,
     format: null
   })
-  const [isInitialized, setIsInitialized] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const initializeWebGPU = async () => {
-      try {
-        const canvas = canvasRef.current
-        if (!canvas) return
+    const initWebGPU = async () => {
+      if (!canvasRef.current) return
 
-        // Get WebGPU adapter
+      try {
+        // Check if WebGPU is supported
+        if (!navigator.gpu) {
+          console.warn('WebGPU not supported')
+          return
+        }
+
+        // Request adapter
         const adapter = await navigator.gpu?.requestAdapter()
         if (!adapter) {
-          throw new Error('Failed to get WebGPU adapter')
+          console.warn('No WebGPU adapter found')
+          return
         }
 
-        // Get WebGPU device
+        // Request device
         const device = await adapter.requestDevice()
-        if (!device) {
-          throw new Error('Failed to get WebGPU device')
-        }
 
         // Get canvas context
-        const context = canvas.getContext('webgpu')
+        const canvas = canvasRef.current
+        // TypeScript fix: cast to unknown first, then to GPUCanvasContext
+        const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext
         if (!context) {
-          throw new Error('Failed to get WebGPU context')
+          console.warn('WebGPU context not available')
+          return
         }
 
         // Get preferred format
@@ -49,21 +47,17 @@ export const useWebGPU = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         context.configure({
           device,
           format,
-          alphaMode: 'premultiplied',
+          alphaMode: 'premultiplied'
         })
 
-        setWebGPUState({ adapter, device, context, format })
-        setIsInitialized(true)
-        console.log('WebGPU initialized successfully!')
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-        console.error('WebGPU initialization failed:', err)
+        setState({ adapter, device, context, format })
+      } catch (error) {
+        console.error('Failed to initialize WebGPU:', error)
       }
     }
 
-    initializeWebGPU()
+    initWebGPU()
   }, [canvasRef])
 
-  return { webGPUState, isInitialized, error }
+  return state
 }

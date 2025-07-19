@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Documentation files
+README.md
+docs/
+*.md
+
+# Debug and development files
+debug-logs/
+debug-session.json
+scripts/

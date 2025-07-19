@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { drawingEngine } from '../wasm/drawingEngine';
+import { drawingEngine, testWASM } from '../wasm/drawingEngine';
 
 export const useWASM = () => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -8,6 +8,15 @@ export const useWASM = () => {
   useEffect(() => {
     const loadWASM = async () => {
       try {
+        // Run the test function first to verify WASM functionality
+        console.log('Testing WASM functionality...');
+        const testResult = await testWASM();
+        if (!testResult) {
+          setError('WASM test failed');
+          return;
+        }
+        
+        // If test passes, proceed with normal loading
         await drawingEngine.loadWASM();
         // Add a small delay to ensure the engine is fully ready
         setTimeout(() => {
