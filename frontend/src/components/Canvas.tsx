@@ -1,82 +1,46 @@
-import { useRef, useState, useEffect } from 'react'
-import { useWASM } from '../hooks/useWasm'
-import { useToolManager } from '../hooks/useToolManager'
-import type { WASMStroke } from '../types/wasm'
-import type { Point, Stroke } from '../interfaces/canvas'
+import { useRef, useEffect, useState } from 'react'
+import { useWhiteboard } from '../contexts/WhiteboardContext'
+import type { Point } from '../interfaces/canvas'
+import { 
+  logger, 
+  ToolDebugger, 
+  EventDebugger
+} from '../utils/debug'
 
-// Helper function to convert WASM stroke to React stroke
-const wasmStrokeToReact = (wasmStroke: WASMStroke): Stroke => {
-  // Add safety checks for undefined properties
-  if (!wasmStroke) {
-    console.error('wasmStroke is undefined or null');
-    return {
-      points: [],
-      color: 'rgb(0, 0, 0)',
-      thickness: 1
-    };
-  }
-  
-  if (!wasmStroke.color) {
-    console.error('wasmStroke.color is undefined:', wasmStroke);
-    return {
-      points: wasmStroke.points || [],
-      color: 'rgb(0, 0, 0)',
-      thickness: wasmStroke.thickness || 1
-    };
-  }
-  
-  return {
-    points: wasmStroke.points || [],
-    color: `rgb(${Math.round((wasmStroke.color.r || 0) * 255)}, ${Math.round((wasmStroke.color.g || 0) * 255)}, ${Math.round((wasmStroke.color.b || 0) * 255)})`,
-    thickness: wasmStroke.thickness || 1
-  }
-}
-
-export const Canvas = () => {
+export const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { drawingEngine: wasmEngine, isLoaded, error } = useWASM()
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [shapeStart, setShapeStart] = useState<Point | null>(null)
+  
   const {
-    activeTool,
-    settings,
-    handlePointerDown: toolPointerDown,
-    handlePointerMove: toolPointerMove,
-    handlePointerUp: toolPointerUp
-  } = useToolManager()
-  
-  // Keep React state for UI-only features
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null)
-  const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [selectedStrokes, setSelectedStrokes] = useState<Set<number>>(new Set())
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState<Point | null>(null)
-  const [exportFormat, setExportFormat] = useState<'png' | 'svg'>('png')
-  const [previewShape, setPreviewShape] = useState<Stroke | null>(null)
+    state,
+    startDrawing,
+    continueDrawing,
+    finishDrawing,
+    eraseAtPoint,
+    selectStrokes,
+    moveSelectedStrokes,
+    deleteSelectedStrokes,
+    clearCanvas,
+    triggerStrokeUpdate
+  } = useWhiteboard()
 
-  // Force re-render when strokes change (this is a workaround since we can't easily track WASM changes)
-  const [strokeUpdateTrigger, setStrokeUpdateTrigger] = useState(0)
-  
-  const triggerStrokeUpdate = () => {
-    setStrokeUpdateTrigger(prev => prev + 1)
-  }
-
-  // Sync strokes from WASM to React state
+  // Debug: Log state changes
   useEffect(() => {
-    if (!isLoaded) return; // Don't call WASM until loaded
-    try {
-      const wasmStrokes = wasmEngine.getStrokes()
-      const reactStrokes = wasmStrokes.map(wasmStrokeToReact)
-      console.log('Syncing strokes from WASM:', wasmStrokes.length, 'strokes')
-      setStrokes(reactStrokes)
-    } catch (err) {
-      console.error('Failed to get strokes from WASM:', err)
-    }
-  }, [isLoaded, wasmEngine, strokeUpdateTrigger])
+    console.log('Canvas state updated:', {
+      activeTool: state.activeTool?.id || 'UNDEFINED',
+      isWasmLoaded: state.isWasmLoaded,
+      strokesCount: state.strokes.length,
+      currentStroke: state.currentStroke ? state.currentStroke.points.length : 0,
+      allToolsCount: state.allTools.length
+    })
+  }, [state.activeTool?.id, state.isWasmLoaded, state.strokes.length, state.currentStroke, state.allTools.length])
 
   // Helper functions
   const isPointInRect = (pt: Point, x1: number, y1: number, x2: number, y2: number) =>
     pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2
 
-  const isPointNearStroke = (pt: Point, stroke: Stroke, threshold = 8) => {
+  const isPointNearStroke = (pt: Point, stroke: any, threshold = 8) => {
     for (let i = 0; i < stroke.points.length - 1; i++) {
       const a = stroke.points[i]
       const b = stroke.points[i + 1]
@@ -96,108 +60,103 @@ export const Canvas = () => {
     return false
   }
 
-  // Unified event handlers that integrate with tool manager
+  // Unified event handlers
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (!isLoaded || !canvasRef.current) return
+    if (!state.isWasmLoaded || !canvasRef.current) {
+      console.log('Canvas not ready:', { isWasmLoaded: state.isWasmLoaded, canvas: !!canvasRef.current })
+      return
+    }
+    
+    if (!state.activeTool || !state.activeTool.id) {
+      console.log('No active tool available:', state.activeTool)
+      return
+    }
     
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
+    setIsDrawing(true)
     
-    console.log('Tool active:', activeTool.id, 'Mouse:', mouse)
+    console.log('Pointer down:', { tool: state.activeTool.id, mouse, buttons: e.buttons })
     
-    // Call tool manager first to set up tool state
-    toolPointerDown(e.nativeEvent, canvasRef.current)
+    // Debug logging
+    ToolDebugger.logPointerEvent(state.activeTool.id, 'pointerDown', mouse)
+    EventDebugger.logMouseEvent('pointerDown', mouse, e.buttons)
     
-    // Handle tool-specific logic based on active tool
-    if (activeTool.id === 'eraser') {
-      handleEraserDown(mouse)
-    } else if (activeTool.id === 'select') {
+    // Handle tool-specific logic
+    if (state.activeTool.id === 'eraser') {
+      ToolDebugger.logToolAction('eraser', 'start', mouse)
+      eraseAtPoint(mouse)
+    } else if (state.activeTool.id === 'select') {
+      ToolDebugger.logToolAction('select', 'start', mouse)
       handleSelectDown(mouse)
-    } else if (activeTool.id === 'stroke') {
-      handleStrokeDown(mouse)
-    } else if (activeTool.id === 'rectangle' || activeTool.id === 'ellipse') {
+    } else if (state.activeTool.id === 'stroke') {
+      ToolDebugger.logToolAction('stroke', 'start', mouse)
+      console.log('Starting stroke drawing')
+      startDrawing(mouse)
+    } else if (state.activeTool.id === 'rectangle' || state.activeTool.id === 'ellipse') {
+      ToolDebugger.logToolAction(state.activeTool.id, 'start', mouse)
+      setShapeStart(mouse)
       handleShapeDown(mouse)
     }
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isLoaded || !canvasRef.current) return
+    if (!state.isWasmLoaded || !canvasRef.current) return
+    
+    if (!state.activeTool || !state.activeTool.id) return
     
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
     
-    // Call tool manager first to update tool state
-    toolPointerMove(e.nativeEvent, canvasRef.current)
+    // Only handle move operations when mouse button is pressed (e.buttons > 0)
+    if (e.buttons === 0) {
+      // Mouse is moving but no button is pressed - just update preview
+      if (state.activeTool.id === 'rectangle' || state.activeTool.id === 'ellipse') {
+        handleShapeMove(mouse)
+      }
+      return
+    }
     
-    // Handle tool-specific logic based on active tool
-    if (activeTool.id === 'eraser' && e.buttons) {
-      handleEraserMove(mouse)
-    } else if (activeTool.id === 'select') {
+    // Handle tool-specific logic when mouse button is pressed
+    if (state.activeTool.id === 'eraser') {
+      eraseAtPoint(mouse)
+    } else if (state.activeTool.id === 'select') {
       handleSelectMove(mouse)
-    } else if (activeTool.id === 'stroke') {
-      handleStrokeMove(mouse)
-    } else if (activeTool.id === 'rectangle' || activeTool.id === 'ellipse') {
+    } else if (state.activeTool.id === 'stroke') {
+      console.log('Continuing stroke drawing')
+      continueDrawing(mouse)
+    } else if (state.activeTool.id === 'rectangle' || state.activeTool.id === 'ellipse') {
       handleShapeMove(mouse)
     }
   }
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!isLoaded || !canvasRef.current) return
+    if (!state.isWasmLoaded || !canvasRef.current) return
     
-    // Handle tool-specific logic based on active tool
-    if (activeTool.id === 'select') {
+    if (!state.activeTool || !state.activeTool.id) return
+    
+    const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY }
+    setIsDrawing(false)
+    
+    console.log('Pointer up:', { tool: state.activeTool.id, mouse })
+    
+    // Handle tool-specific logic
+    if (state.activeTool.id === 'select') {
       handleSelectUp()
-    } else if (activeTool.id === 'stroke') {
-      handleStrokeUp()
-    } else if (activeTool.id === 'rectangle' || activeTool.id === 'ellipse') {
-      handleShapeUp()
-    }
-    
-    // Call tool manager last to finalize tool state
-    toolPointerUp(e.nativeEvent, canvasRef.current)
-  }
-
-  // Tool-specific handlers
-  const handleEraserDown = (mouse: Point) => {
-    try {
-      const wasmStrokes = wasmEngine.getStrokes()
-      const eraserSize = settings.eraserSize || 10
-      for (let i = wasmStrokes.length - 1; i >= 0; i--) {
-        const stroke = wasmStrokes[i]
-        const reactStroke = wasmStrokeToReact(stroke)
-        if (isPointNearStroke(mouse, reactStroke, eraserSize)) {
-          wasmEngine.removeStroke(i)
-          triggerStrokeUpdate()
-          break
-        }
-      }
-    } catch (err) {
-      console.log('WASM not ready yet:', err)
+    } else if (state.activeTool.id === 'stroke') {
+      console.log('Finishing stroke drawing')
+      finishDrawing()
+    } else if (state.activeTool.id === 'rectangle' || state.activeTool.id === 'ellipse') {
+      handleShapeUp(mouse)
+      setShapeStart(null)
     }
   }
 
-  const handleEraserMove = (mouse: Point) => {
-    try {
-      const wasmStrokes = wasmEngine.getStrokes()
-      const eraserSize = settings.eraserSize || 10
-      for (let i = wasmStrokes.length - 1; i >= 0; i--) {
-        const stroke = wasmStrokes[i]
-        const reactStroke = wasmStrokeToReact(stroke)
-        if (isPointNearStroke(mouse, reactStroke, eraserSize)) {
-          wasmEngine.removeStroke(i)
-          triggerStrokeUpdate()
-          break
-        }
-      }
-    } catch (err) {
-      console.log('WASM not ready yet:', err)
-    }
-  }
-
+  // Selection handlers
   const handleSelectDown = (mouse: Point) => {
     // Check if clicking on a selected item to start dragging
-    if (selectedStrokes.size > 0) {
+    if (state.selectedStrokes.size > 0) {
       let inside = false
-      strokes.forEach((stroke, i) => {
-        if (selectedStrokes.has(i)) {
+      state.strokes.forEach((stroke, i) => {
+        if (state.selectedStrokes.has(i)) {
           for (const pt of stroke.points) {
             if (isPointInRect(mouse, pt.x - 5, pt.y - 5, pt.x + 5, pt.y + 5)) {
               inside = true
@@ -207,218 +166,116 @@ export const Canvas = () => {
         }
       })
       if (inside) {
-        setIsDragging(true)
-        setDragStart(mouse)
+        // Start dragging - this would need to be handled in the context
         return
       }
     }
     
     // Start new selection
-    setSelectedStrokes(new Set())
-    setIsDragging(false)
-    setDragStart(null)
+    selectStrokes(new Set())
   }
 
   const handleSelectMove = (mouse: Point) => {
-    if (isDragging && dragStart) {
-      try {
-        const dx = mouse.x - dragStart.x
-        const dy = mouse.y - dragStart.y
-        selectedStrokes.forEach(index => {
-          wasmEngine.moveStroke(index, dx, dy)
-        })
-        triggerStrokeUpdate()
-      } catch (err) {
-        console.log('WASM not ready yet:', err)
-      }
-      setDragStart(mouse)
+    if (state.isDragging && state.dragStart) {
+      const dx = mouse.x - state.dragStart.x
+      const dy = mouse.y - state.dragStart.y
+      moveSelectedStrokes(dx, dy)
     }
   }
 
   const handleSelectUp = () => {
-    if (isDragging) {
-      setIsDragging(false)
-      setDragStart(null)
-    }
+    // Handle selection end - would need to be implemented in context
   }
 
-  const handleStrokeDown = (mouse: Point) => {
-    // Start drawing with the active tool
-    activeTool.startDrawing?.(mouse)
-    
-    try {
-      // Start new stroke in WASM
-      const wasmStroke: WASMStroke = {
-        points: [mouse],
-        color: settings.color,
-        thickness: settings.thickness
-      }
-      wasmEngine.addStroke(wasmStroke)
-      triggerStrokeUpdate()
-    } catch (err) {
-      console.error('WASM stroke error:', err)
-      return
-    }
-    
-    // Also keep in React state for immediate UI feedback
-    setCurrentStroke({
-      points: [mouse],
-      color: `rgb(${Math.round(settings.color.r * 255)}, ${Math.round(settings.color.g * 255)}, ${Math.round(settings.color.b * 255)})`,
-      thickness: settings.thickness
-    })
-  }
-
-  const handleStrokeMove = (mouse: Point) => {
-    // Continue drawing with the active tool
-    activeTool.continueDrawing?.(mouse)
-    
-    if (currentStroke) {
-      try {
-        // Add point to current stroke in WASM
-        const strokeIndex = wasmEngine.getStrokes().length - 1
-        wasmEngine.addPointToStroke(strokeIndex, mouse)
-        triggerStrokeUpdate()
-      } catch (err) {
-        console.log('WASM not ready yet:', err)
-        return
-      }
-      
-      // Update React state for immediate feedback
-      setCurrentStroke({
-        points: [...currentStroke.points, mouse],
-        color: currentStroke.color,
-        thickness: currentStroke.thickness
-      })
-    }
-  }
-
-  const handleStrokeUp = () => {
-    // Finish drawing with the active tool
-    activeTool.finishDrawing?.()
-    
-    if (currentStroke && currentStroke.points.length > 0) {
-      try {
-        // Ensure the last point is added to the WASM stroke
-        const wasmStrokes = wasmEngine.getStrokes()
-        const strokeIndex = wasmStrokes.length - 1
-        const lastPoint = currentStroke.points[currentStroke.points.length - 1]
-        wasmEngine.addPointToStroke(strokeIndex, lastPoint)
-        triggerStrokeUpdate()
-      } catch (err) {
-        console.log('WASM not ready yet:', err)
-      }
-      
-      // Clear current stroke
-      setCurrentStroke(null)
-    }
-  }
-
+  // Shape handlers - now properly implemented
   const handleShapeDown = (mouse: Point) => {
-    // Start drawing with the active tool
-    activeTool.startDrawing?.(mouse)
-    setPreviewShape(null)
+    console.log('Starting shape drawing:', state.activeTool.id)
+    // Shape drawing will be handled in move/up events
   }
 
   const handleShapeMove = (mouse: Point) => {
-    // Continue drawing with the active tool
-    activeTool.continueDrawing?.(mouse)
+    if (!shapeStart) return
     
-    // Create preview for shape tools
-    if (activeTool.id === 'rectangle') {
-      const tool = activeTool
-      if (tool.isDrawing && tool.getCurrentBounds) {
-        const bounds = tool.getCurrentBounds()
-        if (bounds) {
-          // Create preview rectangle
-          const points = [
-            { x: bounds.x1, y: bounds.y1 },
-            { x: bounds.x2, y: bounds.y1 },
-            { x: bounds.x2, y: bounds.y2 },
-            { x: bounds.x1, y: bounds.y2 },
-            { x: bounds.x1, y: bounds.y1 }
-          ]
-          setPreviewShape({
-            points,
-            color: `rgb(${Math.round(settings.color.r * 255)}, ${Math.round(settings.color.g * 255)}, ${Math.round(settings.color.b * 255)})`,
-            thickness: settings.thickness
-          })
-        }
+    console.log('Drawing shape preview:', state.activeTool.id, { start: shapeStart, current: mouse })
+    
+    // Create preview shape based on tool type
+    if (state.activeTool.id === 'rectangle') {
+      const points = [
+        { x: shapeStart.x, y: shapeStart.y },
+        { x: mouse.x, y: shapeStart.y },
+        { x: mouse.x, y: mouse.y },
+        { x: shapeStart.x, y: mouse.y },
+        { x: shapeStart.x, y: shapeStart.y }
+      ]
+      
+      // Update preview shape in context (this would need to be added to context)
+      console.log('Rectangle preview points:', points)
+    } else if (state.activeTool.id === 'ellipse') {
+      const centerX = (shapeStart.x + mouse.x) / 2
+      const centerY = (shapeStart.y + mouse.y) / 2
+      const radiusX = Math.abs(mouse.x - shapeStart.x) / 2
+      const radiusY = Math.abs(mouse.y - shapeStart.y) / 2
+      
+      const points: Point[] = []
+      const segments = 32
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * 2 * Math.PI
+        points.push({
+          x: centerX + radiusX * Math.cos(angle),
+          y: centerY + radiusY * Math.sin(angle)
+        })
       }
-    } else if (activeTool.id === 'ellipse') {
-      const tool = activeTool
-      if (tool.isDrawing && tool.getCurrentBounds) {
-        const bounds = tool.getCurrentBounds()
-        if (bounds) {
-          // Create preview ellipse
-          const centerX = (bounds.x1 + bounds.x2) / 2
-          const centerY = (bounds.y1 + bounds.y2) / 2
-          const radiusX = Math.abs(bounds.x2 - bounds.x1) / 2
-          const radiusY = Math.abs(bounds.y2 - bounds.y1) / 2
-          
-          const points: Point[] = []
-          const segments = 32
-          for (let i = 0; i <= segments; i++) {
-            const angle = (i / segments) * 2 * Math.PI
-            points.push({
-              x: centerX + radiusX * Math.cos(angle),
-              y: centerY + radiusY * Math.sin(angle)
-            })
-          }
-          
-          setPreviewShape({
-            points,
-            color: `rgb(${Math.round(settings.color.r * 255)}, ${Math.round(settings.color.g * 255)}, ${Math.round(settings.color.b * 255)})`,
-            thickness: settings.thickness
-          })
-        }
-      }
+      
+      console.log('Ellipse preview points:', points)
     }
   }
 
-  const handleShapeUp = () => {
-    // Finish drawing with the active tool
-    const shape = activeTool.finishDrawing?.()
-    if (shape) {
-      try {
-        wasmEngine.addShape(shape)
-        triggerStrokeUpdate()
-      } catch (err) {
-        console.error('WASM shape error:', err)
+  const handleShapeUp = (mouse: Point) => {
+    if (!shapeStart) return
+    
+    console.log('Finishing shape drawing:', state.activeTool.id, { start: shapeStart, end: mouse })
+    
+    // For now, create a stroke-based shape (simplified)
+    if (state.activeTool.id === 'rectangle') {
+      const points = [
+        { x: shapeStart.x, y: shapeStart.y },
+        { x: mouse.x, y: shapeStart.y },
+        { x: mouse.x, y: mouse.y },
+        { x: shapeStart.x, y: mouse.y },
+        { x: shapeStart.x, y: shapeStart.y }
+      ]
+      
+      // Create a stroke for the rectangle
+      startDrawing(points[0])
+      points.slice(1).forEach(point => {
+        continueDrawing(point)
+      })
+      finishDrawing()
+      
+    } else if (state.activeTool.id === 'ellipse') {
+      const centerX = (shapeStart.x + mouse.x) / 2
+      const centerY = (shapeStart.y + mouse.y) / 2
+      const radiusX = Math.abs(mouse.x - shapeStart.x) / 2
+      const radiusY = Math.abs(mouse.y - shapeStart.y) / 2
+      
+      const points: Point[] = []
+      const segments = 32
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * 2 * Math.PI
+        points.push({
+          x: centerX + radiusX * Math.cos(angle),
+          y: centerY + radiusY * Math.sin(angle)
+        })
       }
-    }
-    setPreviewShape(null)
-  }
-
-  const handleExport = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    if (exportFormat === 'png') {
-      // Export as PNG
-      const url = canvas.toDataURL('image/png')
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'whiteboard.png'
-      link.click()
-    } else if (exportFormat === 'svg') {
-      // Export as SVG (draw strokes as SVG paths)
-      const svgHeader = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">`
-      const svgFooter = `</svg>`
-      const svgStrokes = strokes.map(stroke => {
-        if (stroke.points.length < 2) return ''
-        const d = stroke.points.map((pt, i) =>
-          i === 0 ? `M${pt.x},${pt.y}` : `L${pt.x},${pt.y}`
-        ).join(' ')
-        return `<path d="${d}" stroke="${stroke.color}" stroke-width="${stroke.thickness}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
-      }).join('')
-      const svgContent = svgHeader + svgStrokes + svgFooter
-      const blob = new Blob([svgContent], { type: 'image/svg+xml' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = 'whiteboard.svg'
-      link.click()
-      URL.revokeObjectURL(url)
+      
+      // Create a stroke for the ellipse
+      if (points.length > 0) {
+        startDrawing(points[0])
+        points.slice(1).forEach(point => {
+          continueDrawing(point)
+        })
+        finishDrawing()
+      }
     }
   }
 
@@ -431,11 +288,13 @@ export const Canvas = () => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+    console.log('Drawing strokes:', state.strokes.length, 'current stroke points:', state.currentStroke?.points.length || 0)
+
     // Draw all strokes (highlight selected)
-    strokes.forEach((stroke, i) => {
+    state.strokes.forEach((stroke, i) => {
       if (!stroke.points || stroke.points.length === 0) return;
       ctx.save()
-      ctx.strokeStyle = selectedStrokes.has(i) ? "rgba(0, 255, 0, 0.8)" : stroke.color
+      ctx.strokeStyle = state.selectedStrokes.has(i) ? "rgba(0, 255, 0, 0.8)" : stroke.color
       ctx.lineWidth = stroke.thickness
       ctx.beginPath()
       if (stroke.points[0] && typeof stroke.points[0].x === 'number' && typeof stroke.points[0].y === 'number') {
@@ -451,77 +310,72 @@ export const Canvas = () => {
     })
 
     // Draw the current stroke
-    if (currentStroke && currentStroke.points.length > 1) {
+    if (state.currentStroke && state.currentStroke.points.length > 1) {
       ctx.save()
-      ctx.strokeStyle = currentStroke.color
-      ctx.lineWidth = currentStroke.thickness
+      ctx.strokeStyle = state.currentStroke.color
+      ctx.lineWidth = state.currentStroke.thickness
       ctx.beginPath()
-      ctx.moveTo(currentStroke.points[0].x, currentStroke.points[0].y)
-      currentStroke.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
+      ctx.moveTo(state.currentStroke.points[0].x, state.currentStroke.points[0].y)
+      state.currentStroke.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
       ctx.stroke()
       ctx.restore()
     }
 
     // Draw preview shape
-    if (previewShape && previewShape.points.length > 1) {
+    if (state.previewShape && state.previewShape.points.length > 1) {
       ctx.save()
-      ctx.strokeStyle = previewShape.color
-      ctx.lineWidth = previewShape.thickness
+      ctx.strokeStyle = state.previewShape.color
+      ctx.lineWidth = state.previewShape.thickness
       ctx.setLineDash([5, 5]) // Dashed line for preview
       ctx.beginPath()
-      ctx.moveTo(previewShape.points[0].x, previewShape.points[0].y)
-      previewShape.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
+      ctx.moveTo(state.previewShape.points[0].x, state.previewShape.points[0].y)
+      state.previewShape.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
       ctx.stroke()
       ctx.restore()
     }
-  }, [strokes, currentStroke, activeTool.id, selectedStrokes, previewShape])
+  }, [state.strokes, state.currentStroke, state.activeTool.id, state.selectedStrokes, state.previewShape])
 
-  if (error) {
-    return <div>Error loading WASM: {error}</div>
+  if (state.wasmError) {
+    return <div>Error loading WASM: {state.wasmError}</div>
   }
 
-  if (!isLoaded) {
+  if (!state.isWasmLoaded) {
     return <div>Loading WASM...</div>
   }
 
   return (
     <>
       <div style={{ margin: "1em 0" }}>
+        <div style={{ marginBottom: "10px", fontSize: "12px", color: "#666" }}>
+          Debug: Tool: {state.activeTool?.id || 'UNDEFINED'} | Strokes: {state.strokes.length} | 
+          Current: {state.currentStroke?.points.length || 0} | 
+          Drawing: {isDrawing ? 'Yes' : 'No'}
+        </div>
         <label>
           Export as:{" "}
-          <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'png' | 'svg')}>
+          <select value={state.exportFormat} onChange={e => {
+            // This would need to be implemented in the context
+          }}>
             <option value="png">PNG</option>
             <option value="svg">SVG</option>
           </select>
         </label>
         <button
-          onClick={() => {
-            // Remove selected strokes from WASM
-            const indicesToRemove = Array.from(selectedStrokes).sort((a, b) => b - a); // Sort in descending order
-            indicesToRemove.forEach(index => {
-              wasmEngine.removeStroke(index);
-            });
-            setSelectedStrokes(new Set());
-            triggerStrokeUpdate(); // Trigger re-render after deleting
-          }}
-          disabled={selectedStrokes.size === 0}
+          onClick={deleteSelectedStrokes}
+          disabled={state.selectedStrokes.size === 0}
         >
           Delete Selected
         </button>
-        <button onClick={handleExport}>Save</button>
         <button onClick={() => {
-          if (wasmEngine) {
-            wasmEngine.clear()
-            setSelectedStrokes(new Set())
-            triggerStrokeUpdate() // Trigger re-render after clearing
-          }
-        }}>Clear All</button>
+          // Export logic would be implemented here
+        }}>Save</button>
+        <button onClick={clearCanvas}>Clear All</button>
       </div>
       <canvas
         ref={canvasRef}
         width={800}
         height={600}
-        style={{ border: '2px solid #333', background: 'white', cursor: activeTool.cursor }}
+        style={{ border: '2px solid #333', background: 'white', cursor: state.activeTool?.cursor || 'default' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

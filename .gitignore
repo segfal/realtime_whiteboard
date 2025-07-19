@@ -58,6 +58,24 @@ external/
 # Logs
 *.log
 
+# Debug files and logs
+debug-logs/
+debug-session.json
+DEBUG_*.md
+ERASER_BUG_ANALYSIS.md
+TEST_ERASER_FIX.md
+README_BACKEND_TESTING.md
+commit_message.txt
+
+# Backend debug files
+backend/debug_results_*.txt
+backend/stroke_debug
+backend/stroke_debug.dSYM/
+backend/test_strokes.dSYM/
+backend/src/debug_main.cpp
+backend/run_tests.py
+run_backend_tests.sh
+
 # Temporary files
 *.tmp
 *.temp
@@ -85,3 +103,4 @@ external/
 Makefile
 
 .cursor/rules
+.obsidian
