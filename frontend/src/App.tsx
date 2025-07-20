@@ -1,6 +1,5 @@
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
-import { DebugPanel } from './components/DebugPanel'
 import { WhiteboardProvider, useWhiteboard } from './contexts/WhiteboardContext'
 import type { ToolType } from './types/tool'
 import './App.css'
@@ -49,7 +48,6 @@ const AppContent: React.FC = () => {
         onSettingsChange={handleSettingsChange}
       />
       <Canvas />
-      <DebugPanel />
     </div>
   )
 }
