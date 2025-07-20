@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@webgpu/types": "^0.1.64",
-  "react": "^19.1.0",
+    "debug": "^4.4.1",
+    "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
