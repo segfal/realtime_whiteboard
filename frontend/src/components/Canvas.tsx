@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useWhiteboard } from '../contexts/WhiteboardContext'
+import { useWASM } from '../hooks/useWasm'
 import type { Point } from '../interfaces/canvas'
 import { 
   logger, 
@@ -11,6 +12,9 @@ export const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [shapeStart, setShapeStart] = useState<Point | null>(null)
+  const [previewShape, setPreviewShape] = useState<{ points: Point[], color: string, thickness: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<Point | null>(null)
   
   const {
     state,
@@ -24,6 +28,9 @@ export const Canvas: React.FC = () => {
     clearCanvas,
     triggerStrokeUpdate
   } = useWhiteboard()
+  
+  // Get direct access to WASM engine for faster shape creation
+  const { drawingEngine: wasmEngine } = useWASM()
 
   // Debug: Log state changes
   useEffect(() => {
@@ -147,6 +154,7 @@ export const Canvas: React.FC = () => {
     } else if (state.activeTool.id === 'rectangle' || state.activeTool.id === 'ellipse') {
       handleShapeUp(mouse)
       setShapeStart(null)
+      setPreviewShape(null) // Clear preview shape
     }
   }
 
@@ -166,25 +174,47 @@ export const Canvas: React.FC = () => {
         }
       })
       if (inside) {
-        // Start dragging - this would need to be handled in the context
+        // Start dragging selected items
+        setIsDragging(true)
+        setDragStart(mouse)
         return
       }
     }
     
-    // Start new selection
-    selectStrokes(new Set())
+    // Check if clicking on any stroke to select it
+    let strokeClicked = false
+    state.strokes.forEach((stroke, i) => {
+      if (!strokeClicked) {
+        for (const pt of stroke.points) {
+          if (isPointInRect(mouse, pt.x - 5, pt.y - 5, pt.x + 5, pt.y + 5)) {
+            selectStrokes(new Set([i]))
+            strokeClicked = true
+            break
+          }
+        }
+      }
+    })
+    
+    // If no stroke was clicked, clear selection
+    if (!strokeClicked) {
+      selectStrokes(new Set())
+    }
   }
 
   const handleSelectMove = (mouse: Point) => {
-    if (state.isDragging && state.dragStart) {
-      const dx = mouse.x - state.dragStart.x
-      const dy = mouse.y - state.dragStart.y
+    if (isDragging && dragStart) {
+      const dx = mouse.x - dragStart.x
+      const dy = mouse.y - dragStart.y
       moveSelectedStrokes(dx, dy)
+      // Update drag start to current position for continuous movement
+      setDragStart(mouse)
     }
   }
 
   const handleSelectUp = () => {
-    // Handle selection end - would need to be implemented in context
+    // End dragging
+    setIsDragging(false)
+    setDragStart(null)
   }
 
   // Shape handlers - now properly implemented
@@ -208,8 +238,13 @@ export const Canvas: React.FC = () => {
         { x: shapeStart.x, y: shapeStart.y }
       ]
       
-      // Update preview shape in context (this would need to be added to context)
-      console.log('Rectangle preview points:', points)
+      // Update local preview shape for real-time display
+      setPreviewShape({
+        points: points,
+        color: `rgb(${Math.round(state.settings.color.r * 255)}, ${Math.round(state.settings.color.g * 255)}, ${Math.round(state.settings.color.b * 255)})`,
+        thickness: state.settings.thickness
+      })
+      
     } else if (state.activeTool.id === 'ellipse') {
       const centerX = (shapeStart.x + mouse.x) / 2
       const centerY = (shapeStart.y + mouse.y) / 2
@@ -226,7 +261,12 @@ export const Canvas: React.FC = () => {
         })
       }
       
-      console.log('Ellipse preview points:', points)
+      // Update local preview shape for real-time display
+      setPreviewShape({
+        points: points,
+        color: `rgb(${Math.round(state.settings.color.r * 255)}, ${Math.round(state.settings.color.g * 255)}, ${Math.round(state.settings.color.b * 255)})`,
+        thickness: state.settings.thickness
+      })
     }
   }
 
@@ -235,22 +275,51 @@ export const Canvas: React.FC = () => {
     
     console.log('Finishing shape drawing:', state.activeTool.id, { start: shapeStart, end: mouse })
     
-    // For now, create a stroke-based shape (simplified)
     if (state.activeTool.id === 'rectangle') {
-      const points = [
-        { x: shapeStart.x, y: shapeStart.y },
-        { x: mouse.x, y: shapeStart.y },
-        { x: mouse.x, y: mouse.y },
-        { x: shapeStart.x, y: mouse.y },
-        { x: shapeStart.x, y: shapeStart.y }
-      ]
+      // Create rectangle shape using proper shape creation
+      const rectangleShape = {
+        type: 'rectangle' as const,
+        topLeft: {
+          x: Math.min(shapeStart.x, mouse.x),
+          y: Math.min(shapeStart.y, mouse.y)
+        },
+        bottomRight: {
+          x: Math.max(shapeStart.x, mouse.x),
+          y: Math.max(shapeStart.y, mouse.y)
+        },
+        color: state.settings.color,
+        thickness: state.settings.thickness
+      }
       
-      // Create a stroke for the rectangle
-      startDrawing(points[0])
-      points.slice(1).forEach(point => {
-        continueDrawing(point)
-      })
-      finishDrawing()
+      // Use the WASM engine's addShape method which handles rectangle conversion properly
+      try {
+        // Use direct WASM engine access for faster shape creation
+        if (wasmEngine) {
+          wasmEngine.addShape(rectangleShape)
+          // Trigger stroke update to refresh the display
+          triggerStrokeUpdate()
+        } else {
+          throw new Error('WASM engine not available')
+        }
+      } catch (error) {
+        console.error('Failed to add rectangle shape:', error)
+        // Fallback to stroke-based approach if WASM fails
+        const points = [
+          { x: shapeStart.x, y: shapeStart.y },
+          { x: mouse.x, y: shapeStart.y },
+          { x: mouse.x, y: mouse.y },
+          { x: shapeStart.x, y: mouse.y },
+          { x: shapeStart.x, y: shapeStart.y }
+        ]
+        
+        if (points.length > 0) {
+          startDrawing(points[0])
+          for (let i = 1; i < points.length; i++) {
+            continueDrawing(points[i])
+          }
+          finishDrawing()
+        }
+      }
       
     } else if (state.activeTool.id === 'ellipse') {
       const centerX = (shapeStart.x + mouse.x) / 2
@@ -258,6 +327,7 @@ export const Canvas: React.FC = () => {
       const radiusX = Math.abs(mouse.x - shapeStart.x) / 2
       const radiusY = Math.abs(mouse.y - shapeStart.y) / 2
       
+      // Create ellipse points with proper closure
       const points: Point[] = []
       const segments = 32
       for (let i = 0; i <= segments; i++) {
@@ -268,13 +338,33 @@ export const Canvas: React.FC = () => {
         })
       }
       
-      // Create a stroke for the ellipse
-      if (points.length > 0) {
-        startDrawing(points[0])
-        points.slice(1).forEach(point => {
-          continueDrawing(point)
-        })
-        finishDrawing()
+      // Create stroke shape for ellipse (since ellipse shapes aren't implemented in WASM yet)
+      const ellipseShape = {
+        type: 'stroke' as const,
+        points: points,
+        color: state.settings.color,
+        thickness: state.settings.thickness
+      }
+      
+      try {
+        // Use direct WASM engine access for faster shape creation
+        if (wasmEngine) {
+          wasmEngine.addShape(ellipseShape)
+          // Trigger stroke update to refresh the display
+          triggerStrokeUpdate()
+        } else {
+          throw new Error('WASM engine not available')
+        }
+      } catch (error) {
+        console.error('Failed to add ellipse shape:', error)
+        // Fallback to stroke-based approach if WASM fails
+        if (points.length > 0) {
+          startDrawing(points[0])
+          for (let i = 1; i < points.length; i++) {
+            continueDrawing(points[i])
+          }
+          finishDrawing()
+        }
       }
     }
   }
@@ -321,7 +411,20 @@ export const Canvas: React.FC = () => {
       ctx.restore()
     }
 
-    // Draw preview shape
+    // Draw local preview shape (for real-time shape preview during dragging)
+    if (previewShape && previewShape.points.length > 1) {
+      ctx.save()
+      ctx.strokeStyle = previewShape.color
+      ctx.lineWidth = previewShape.thickness
+      ctx.setLineDash([5, 5]) // Dashed line for preview
+      ctx.beginPath()
+      ctx.moveTo(previewShape.points[0].x, previewShape.points[0].y)
+      previewShape.points.forEach(pt => ctx.lineTo(pt.x, pt.y))
+      ctx.stroke()
+      ctx.restore()
+    }
+    
+    // Draw context preview shape (for other previews)
     if (state.previewShape && state.previewShape.points.length > 1) {
       ctx.save()
       ctx.strokeStyle = state.previewShape.color
@@ -333,7 +436,7 @@ export const Canvas: React.FC = () => {
       ctx.stroke()
       ctx.restore()
     }
-  }, [state.strokes, state.currentStroke, state.activeTool.id, state.selectedStrokes, state.previewShape])
+  }, [state.strokes, state.currentStroke, state.activeTool.id, state.selectedStrokes, state.previewShape, previewShape])
 
   if (state.wasmError) {
     return <div>Error loading WASM: {state.wasmError}</div>
@@ -375,7 +478,11 @@ export const Canvas: React.FC = () => {
         ref={canvasRef}
         width={800}
         height={600}
-        style={{ border: '2px solid #333', background: 'white', cursor: state.activeTool?.cursor || 'default' }}
+        style={{ 
+          border: '2px solid #333', 
+          background: 'white', 
+          cursor: isDragging ? 'grabbing' : (state.activeTool?.cursor || 'default') 
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
