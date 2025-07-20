@@ -43,6 +43,7 @@ void DrawingEngine::removeStroke(int index) {
         if ((*it)->type == ShapeType::Stroke) {
             if (strokeCount == index) {
                 shapes.erase(it);
+                printf("Removed stroke at index %d\n", index);
                 return;
             }
             strokeCount++;

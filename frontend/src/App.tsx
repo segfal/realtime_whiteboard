@@ -1,22 +1,23 @@
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
-import { useToolManager } from './hooks/useToolManager'
+import { DebugPanel } from './components/DebugPanel'
+import { WhiteboardProvider, useWhiteboard } from './contexts/WhiteboardContext'
 import type { ToolType } from './types/tool'
 import './App.css'
 
-const App: React.FC = () => {
+// Inner App component that uses the context
+const AppContent: React.FC = () => {
   const {
-    activeTool,
-    settings,
+    state,
     setActiveTool,
     updateSettings
-  } = useToolManager()
+  } = useWhiteboard()
 
   const handleToolSelect = (toolType: ToolType) => {
     setActiveTool(toolType)
   }
 
-  const handleSettingsChange = (newSettings: Partial<typeof settings>) => {
+  const handleSettingsChange = (newSettings: Partial<typeof state.settings>) => {
     updateSettings(newSettings)
   }
 
@@ -34,19 +35,31 @@ const App: React.FC = () => {
         fontSize: '12px',
         zIndex: 1001
       }}>
-        <div>Active Tool: {activeTool.id}</div>
-        <div>Color: RGB({Math.round(settings.color.r * 255)}, {Math.round(settings.color.g * 255)}, {Math.round(settings.color.b * 255)})</div>
-        <div>Thickness: {settings.thickness}px</div>
-        <div>Eraser Size: {settings.eraserSize || 10}px</div>
+        <div>Active Tool: {state.activeTool?.id || 'UNDEFINED'}</div>
+        <div>Color: RGB({Math.round(state.settings.color.r * 255)}, {Math.round(state.settings.color.g * 255)}, {Math.round(state.settings.color.b * 255)})</div>
+        <div>Thickness: {state.settings.thickness}px</div>
+        <div>Eraser Size: {state.settings.eraserSize || 10}px</div>
+        <div>WASM Status: {state.isWasmLoaded ? '✅ Loaded' : '⏳ Loading...'}</div>
+        {state.wasmError && <div style={{ color: 'red' }}>WASM Error: {state.wasmError}</div>}
       </div>
       <Toolbar
-        activeTool={activeTool.id as ToolType}
+        activeTool={(state.activeTool?.id as ToolType) || 'stroke'}
         onToolSelect={handleToolSelect}
-        settings={settings}
+        settings={state.settings}
         onSettingsChange={handleSettingsChange}
       />
       <Canvas />
+      <DebugPanel />
     </div>
+  )
+}
+
+// Main App component that provides the context
+const App: React.FC = () => {
+  return (
+    <WhiteboardProvider>
+      <AppContent />
+    </WhiteboardProvider>
   )
 }
 
