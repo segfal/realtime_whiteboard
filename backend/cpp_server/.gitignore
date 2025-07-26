@@ -1,0 +1,32 @@
+# Build directories
+build/
+vendor/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Executables
+server
+*.exe
+
+# Local configuration
+.env
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Temporary files
+*~
+*.swp
+*.swo 
