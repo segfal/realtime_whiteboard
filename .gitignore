@@ -102,4 +102,6 @@ run_backend_tests.sh
 
 
 .cursor/rules
-.obsidian
+.obsidianC++_SERVER_BUILD_GUIDE.md
+backend/cpp_server/build.sh
+backend/cpp_server/test_server.sh
