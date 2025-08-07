@@ -28,6 +28,39 @@ jobs:
         cache: 'npm'
         cache-dependency-path: ./package-lock.json
 
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Run lint
+      working-directory: ./frontend
+      run: npm run lint
+    
+    - name: Type checking
+      working-directory: ./frontend
+      run: npx tsc --noEmit
+    
+    - name: Check Prettier formatting
+      working-directory: ./frontend
+      run: npm run format:check
+    
+    - name: Run unit tests
+      working-directory: ./frontend
+      run: npm test
+
+    - name: Build for production
+      working-directory: ./frontend
+      run: npm run build
+      
+    - name: Upload frontend artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/dist/
+        retention-days: 7
+    
+    
+
 # Backend CI
   backend-ci:
     name: Backend - WebAssembly Build
