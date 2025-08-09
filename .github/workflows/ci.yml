@@ -5,6 +5,7 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch:  # Add this for manual triggering
 
 env:
   NODE_VERSION: '18'
@@ -15,7 +16,7 @@ jobs:
   #frontend CI
   frontend-ci:
     name: Frontend - Lint, Test & Build
-    runs-on: ubuntu-lastest
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
