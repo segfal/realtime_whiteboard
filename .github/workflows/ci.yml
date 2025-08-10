@@ -80,6 +80,7 @@ jobs:
       working-directory: ./backend
       run: |
         source $EMSDK/emsdk_env.sh
+        chmod +x ./scripts/build_wasm.sh
         ./scripts/build_wasm.sh
         
     - name: Upload WASM artifacts
