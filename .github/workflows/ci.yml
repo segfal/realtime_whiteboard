@@ -85,7 +85,13 @@ jobs:
     - name: Build WebAssembly
       working-directory: ./backend
       run: |
-        source ../emsdk/emsdk_env.sh
+        source $EMSDK/emsdk_env.sh
+        echo "Current directory: $(pwd)"
+        echo "Script exists: $(ls -la ./scripts/build_wasm.sh)"
+        chmod +x ./scripts/build_wasm.sh
+        echo "Script permissions after chmod: $(ls -la ./scripts/build_wasm.sh)"
+        mkdir -p build/
+        echo "Running build script..."
         ./scripts/build_wasm.sh
         
     - name: Upload WASM artifacts
