@@ -1,37 +1,13 @@
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, {  useReducer, useCallback, type ReactNode} from 'react';
 import { useWASM } from '../hooks/useWasm';
 import { ToolManager } from '../tools/ToolManager';
+
 import type { ToolType, ToolSettings, DrawingTool } from '../types/tool';
 import type { WASMStroke, WASMShape, WASMPoint } from '../types/wasm';
 import type { Point, Stroke } from '../interfaces/canvas';
 import { logger, ToolDebugger, PerformanceTracker } from '../utils/debug';
-
-// State interface for the whiteboard
-interface WhiteboardState {
-  // Tool management
-  activeTool: DrawingTool;
-  settings: ToolSettings;
-  allTools: DrawingTool[];
-  
-  // Drawing state
-  currentStroke: Stroke | null;
-  strokes: Stroke[];
-  selectedStrokes: Set<number>;
-  previewShape: Stroke | null;
-  
-  // UI state
-  isDragging: boolean;
-  dragStart: Point | null;
-  exportFormat: 'png' | 'svg';
-  
-  // WASM state
-  isWasmLoaded: boolean;
-  wasmError: string | null;
-  
-  // Performance tracking
-  strokeUpdateTrigger: number;
-}
-
+import type { WhiteboardContextType, WhiteboardState } from './types';
+import { WhiteboardContext } from './ctx';
 // Action types for the reducer
 type WhiteboardAction =
   | { type: 'SET_ACTIVE_TOOL'; payload: ToolType }
@@ -72,7 +48,7 @@ const initialState: WhiteboardState = {
 // Reducer function for state management
 function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): WhiteboardState {
   switch (action.type) {
-    case 'SET_ACTIVE_TOOL':
+    case 'SET_ACTIVE_TOOL': { // added curly braces to fix lint error(const var stays local)
       console.log('SET_ACTIVE_TOOL reducer called with:', action.payload)
       console.log('Current allTools:', state.allTools.map(t => t.id))
       const foundTool = state.allTools.find(tool => tool.id === action.payload);
@@ -86,7 +62,7 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
         ...state,
         activeTool: toolToUse
       };
-    
+    }
     case 'UPDATE_SETTINGS':
       return {
         ...state,
@@ -168,39 +144,10 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
   }
 }
 
-// Context interface
-interface WhiteboardContextType {
-  // State
-  state: WhiteboardState;
-  
-  // Tool management
-  setActiveTool: (toolType: ToolType) => void;
-  updateSettings: (settings: Partial<ToolSettings>) => void;
-  
-  // Drawing operations
-  startDrawing: (point: Point) => void;
-  continueDrawing: (point: Point) => void;
-  finishDrawing: () => void;
-  
-  // Eraser operations
-  eraseAtPoint: (point: Point) => void;
-  
-  // Selection operations
-  selectStrokes: (indices: Set<number>) => void;
-  moveSelectedStrokes: (dx: number, dy: number) => void;
-  deleteSelectedStrokes: () => void;
-  
-  // Canvas operations
-  clearCanvas: () => void;
-  exportCanvas: (format: 'png' | 'svg') => void;
-  
-  // Utility
-  triggerStrokeUpdate: () => void;
-  syncStrokesFromWasm: () => void;
-}
+
 
 // Create the context
-const WhiteboardContext = createContext<WhiteboardContextType | undefined>(undefined);
+
 
 // Provider component
 interface WhiteboardProviderProps {
@@ -549,10 +496,3 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
 };
 
 // Custom hook to use the whiteboard context
-export const useWhiteboard = (): WhiteboardContextType => {
-  const context = useContext(WhiteboardContext);
-  if (context === undefined) {
-    throw new Error('useWhiteboard must be used within a WhiteboardProvider');
-  }
-  return context;
-}; 

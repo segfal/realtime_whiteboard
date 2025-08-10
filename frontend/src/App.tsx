@@ -1,6 +1,8 @@
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
-import { WhiteboardProvider, useWhiteboard } from './contexts/WhiteboardContext'
+import { WhiteboardProvider} from './contexts/WhiteboardContext'
+import { useWhiteboard } from './contexts/ctx'
+
 import type { ToolType } from './types/tool'
 import './App.css'
 

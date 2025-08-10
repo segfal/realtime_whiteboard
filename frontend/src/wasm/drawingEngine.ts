@@ -26,7 +26,7 @@ class DrawingEngineBridge {
             
             while (!DrawingEngineModule && attempts < maxAttempts) {
                 // @ts-ignore
-                DrawingEngineModule = (window as any).DrawingEngineModule || (globalThis as any).DrawingEngineModule;
+                DrawingEngineModule = (window as unknown).DrawingEngineModule || (globalThis as unknown).DrawingEngineModule;
                 if (!DrawingEngineModule) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                     attempts++;
