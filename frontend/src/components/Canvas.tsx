@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { useWhiteboard } from '../contexts/WhiteboardContext'
+import { useWhiteboard } from '../contexts/ctx'
 import { useWASM } from '../hooks/useWasm'
 import type { Point } from '../interfaces/canvas'
 import { 

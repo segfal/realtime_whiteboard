@@ -1,3 +1,4 @@
+
 # Build directories
 build/
 out/
@@ -108,3 +109,112 @@ camera_config/*.yaml
 .obsidianC++_SERVER_BUILD_GUIDE.md
 backend/cpp_server/build.sh
 backend/cpp_server/test_server.sh
+
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+RealtimeWhiteboard
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Dependencies
+deps/
+external/
+
+# Logs
+*.log
+
+# Debug files and logs
+debug-logs/
+debug-session.json
+DEBUG_*.md
+ERASER_BUG_ANALYSIS.md
+TEST_ERASER_FIX.md
+README_BACKEND_TESTING.md
+commit_message.txt
+
+# Backend debug files
+backend/debug_results_*.txt
+backend/stroke_debug
+backend/stroke_debug.dSYM/
+backend/test_strokes.dSYM/
+backend/src/debug_main.cpp
+backend/run_tests.py
+run_backend_tests.sh
+
+# Temporary files
+*.tmp
+*.temp
+
+# Model files and datasets
+*.pt
+*.pth
+*.onnx
+*.h5
+*.hdf5
+*.bin
+*.dat
+
+# OpenCV specific
+*.xml
+*.yml
+*.yaml
+
+# Backup files
+*.bak
+*.backup
+*~ 
+
+
+
+.cursor/rules
+.obsidianC++_SERVER_BUILD_GUIDE.md
+backend/cpp_server/build.sh
+backend/cpp_server/test_server.sh
+

@@ -2,10 +2,16 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [ main, test1.ci ]
+    branches: [ main, test1-ci ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:  # Add this for manual triggering
+
+
+permissions:
+  security-events: write  # Required for SARIF upload
+  actions: read
+  contents: read
 
 env:
   NODE_VERSION: '20.19.0'
@@ -80,7 +86,7 @@ jobs:
       working-directory: ./backend
       run: |
         source $EMSDK/emsdk_env.sh
-        chmod +x ./scripts/build_wasm.sh
+        mkdir -p build/
         ./scripts/build_wasm.sh
         
     - name: Upload WASM artifacts
