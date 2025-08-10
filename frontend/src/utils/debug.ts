@@ -2,31 +2,31 @@
 
 // Simple logger implementation
 export const logger = {
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('[DEBUG]', ...args);
     }
   },
   
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     console.log('[INFO]', ...args);
   },
   
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     console.warn('[WARN]', ...args);
   },
   
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error('[ERROR]', ...args);
   },
   
-  logDrawing: async (tool: string, data: any) => {
+  logDrawing: async (tool: string, data: unknown) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('[DRAWING]', tool, data);
     }
   },
   
-  logErasing: async (tool: string, data: any) => {
+  logErasing: async (tool: string, data: unknown) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('[ERASING]', tool, data);
     }
@@ -66,7 +66,7 @@ export class ToolDebugger {
     }
   }
   
-  static logToolAction(toolId: string, action: string, data?: any) {
+  static logToolAction(toolId: string, action: string, data?: unknown) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[TOOL_ACTION]', `${toolId} ${action}:`, data);
     }
@@ -83,7 +83,7 @@ export class ToolDebugger {
 
 // Event debugging utilities
 export class EventDebugger {
-  static logCanvasEvent(event: string, data?: any) {
+  static logCanvasEvent(event: string, data?: unknown) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[CANVAS_EVENT]', event, data);
     }
@@ -153,7 +153,7 @@ export class WASMDebugger {
   }
 }
 
-// Performance tracker for measuring operation times
+// Performance tracker for measuring operation times    
 export class PerformanceTracker {
   private static measurements: Map<string, { start: number; end?: number }> = new Map();
   
@@ -216,7 +216,7 @@ export class DebugSession {
     return this.isActive;
   }
   
-  static log(message: string, data?: any) {
+  static log(message: string, data?: unknown) {
     if (process.env.NODE_ENV === 'development' && this.isActive) {
       console.log(`[DEBUG_SESSION:${this.sessionId}]`, message, data);
     }

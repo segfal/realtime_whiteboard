@@ -90,9 +90,12 @@ run_backend_tests.sh
 *.dat
 
 # OpenCV specific
+# Only ignore YAML files in specific OpenCV-related directories
 *.xml
-*.yml
-*.yaml
+opencv/*.yml
+opencv/*.yaml
+camera_config/*.yml
+camera_config/*.yaml
 
 # Backup files
 *.bak

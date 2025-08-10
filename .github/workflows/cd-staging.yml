@@ -1,0 +1,76 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ test.ci ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - staging-2
+
+env:
+  NODE_VERSION: '20.19.0'
+  Emscripten_VERSION: '3.1.45'
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v13
+      with:
+        version: ${{ env.Emscripten_VERSION }}
+        
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+      
+    - name: Build frontend
+      working-directory: ./frontend
+      env:
+        VITE_API_URL: 
+        VITE_ENVIRONMENT: staging
+      run: npm run build
+      
+    - name: Build WebAssembly backend
+      working-directory: ./backend
+      run: |
+        source $EMSDK/emsdk_env.sh
+        ./scripts/build_wasm.sh
+        
+    - name: Deploy to staging server
+      run: |
+        # Add your staging deployment commands here
+        echo "Deploying to staging environment..."
+        # Example: rsync, scp, or cloud deployment commands
+        
+    - name: Notify deployment
+      if: success()
+      run: |
+        echo "Staging deployment successful!"
+        # Add notification logic (Slack, Discord, etc.)
+        
+    - name: Notify failure
+      if: failure()
+      run: |
+        echo "Staging deployment failed!"
+        # Add failure notification logic
