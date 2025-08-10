@@ -16,7 +16,11 @@
     "debug:full": "npm run debug:chrome & sleep 3 && npm run debug:start-chrome",
     "dev:clean": "./scripts/clear-debug.sh && npm run dev",
     "debug:clean": "./scripts/clear-debug.sh && npm run debug:chrome",
-    "debug:view": "./scripts/view-debug-logs.sh"
+    "debug:view": "./scripts/view-debug-logs.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@webgpu/types": "^0.1.64",
@@ -36,6 +40,8 @@
     "globals": "^16.3.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^1.0.0",
+    "prettier": "^3.0.0"
   }
 }
