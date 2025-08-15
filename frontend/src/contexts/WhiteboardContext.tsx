@@ -8,6 +8,13 @@ import { logger, ToolDebugger, PerformanceTracker } from '../utils/debug';
 
 // State interface for the whiteboard
 interface WhiteboardState {
+
+  // WebSocket State
+  websocket: WebSocket | null;
+  isConnected: boolean;
+  userId: string;
+  currentStrokeId: string | null;
+
   // Tool management
   activeTool: DrawingTool;
   settings: ToolSettings;
@@ -46,7 +53,9 @@ type WhiteboardAction =
   | { type: 'SET_WASM_ERROR'; payload: string | null }
   | { type: 'TRIGGER_STROKE_UPDATE' }
   | { type: 'CLEAR_CANVAS' }
-  | { type: 'SET_ALL_TOOLS'; payload: DrawingTool[] };
+  | { type: 'SET_ALL_TOOLS'; payload: DrawingTool[] }
+  | { type: 'SET_WEBSOCKET_CONNECTED'; payload: { websocket: WebSocket | null; isConnected: boolean } }
+  | { type: 'SET_CURRENT_STROKE_ID'; payload: string | null };
 
 // Initial state
 const initialState: WhiteboardState = {
@@ -66,8 +75,14 @@ const initialState: WhiteboardState = {
   exportFormat: 'png',
   isWasmLoaded: false,
   wasmError: null,
-  strokeUpdateTrigger: 0
+  strokeUpdateTrigger: 0,
+  websocket: null,
+  isConnected: false,
+  userId: localStorage.getItem('userId') || crypto.randomUUID(), //TODO:
+  currentStrokeId: null,
 };
+
+localStorage.setItem('userId', initialState.userId);
 
 // Reducer function for state management
 function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): WhiteboardState {
@@ -163,6 +178,19 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
         allTools: action.payload
       };
     
+    case 'SET_WEBSOCKET_CONNECTED':
+      return {
+        ...state,
+        websocket: action.payload.websocket,
+        isConnected: action.payload.isConnected
+      };
+    
+    case 'SET_CURRENT_STROKE_ID':
+      return {
+        ...state,
+        currentStrokeId: action.payload
+      };
+    
     default:
       return state;
   }
@@ -197,6 +225,13 @@ interface WhiteboardContextType {
   // Utility
   triggerStrokeUpdate: () => void;
   syncStrokesFromWasm: () => void;
+  connectWebSocket: () => void;
+  strokeToJSON: (wasmStroke: WASMStroke) => any;
+  sendStrokeViaWebSocket: (strokeData: any) => void;
+  handleWebSocketMessage: (event: MessageEvent) => void;
+  sendStrokeStart: (point: Point) => void;
+  sendStrokePoint: (strokeId: string, point: Point) => void;
+  sendStrokeFinish: (strokeId: string) => void;
 }
 
 // Create the context
@@ -265,6 +300,36 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
     };
   }, []);
   
+  // WebSocket connection function
+  const connectWebSocket = useCallback(() => {
+    try {
+      const ws = new WebSocket('ws://localhost:9000');
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        dispatch({ type: 'SET_WEBSOCKET_CONNECTED', payload: { websocket: ws, isConnected: true } });
+      };
+      
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        dispatch({ type: 'SET_WEBSOCKET_CONNECTED', payload: { websocket: null, isConnected: false } });
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+    }
+  }, []);
+
+  // Connect WebSocket on mount
+  React.useEffect(() => {
+    console.log('Connecting to WebSocket...');
+    connectWebSocket();
+  }, [connectWebSocket]);
+
   // Sync strokes from WASM to React state
   const syncStrokesFromWasm = useCallback(() => {
     if (!isLoaded) {
@@ -286,6 +351,165 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
     }
   }, [isLoaded, wasmEngine, wasmStrokeToReact]);
   
+
+const strokeToJSON = useCallback((wasmStroke: WASMStroke) => {
+  const strokeId = crypto.randomUUID();
+  const timestamp = Date.now();
+  
+  return {
+    type: "stroke:add",
+    payload: {
+      stroke: {
+        id: strokeId,
+        color: wasmStroke.color,
+        thickness: wasmStroke.thickness,
+        points: wasmStroke.points,
+        timestamp: timestamp,
+        userId: state.userId
+      }
+    }
+  };
+}, [state.userId]);
+
+const sendStrokeViaWebSocket = useCallback((strokeData: any) => {
+  if (state.websocket && state.isConnected) {
+    try {
+      const message = JSON.stringify(strokeData);
+      state.websocket.send(message);
+      console.log('Sent stroke via WebSocket:', strokeData);
+    } catch (error) {
+      console.error('Failed to send stroke via WebSocket:', error);
+    }
+  } else {
+    console.log('WebSocket not connected, cannot send stroke');
+  }
+}, [state.websocket, state.isConnected]);
+
+// New message types for real-time drawing
+const sendStrokeStart = useCallback((point: Point) => {
+  const message = {
+    type: "stroke:start",
+    payload: {
+      strokeId: crypto.randomUUID(),
+      color: state.settings.color,
+      thickness: state.settings.thickness,
+      userId: state.userId,
+      timestamp: Date.now()
+    }
+  };
+  
+  if (state.websocket && state.isConnected) {
+    state.websocket.send(JSON.stringify(message));
+    console.log('Sent stroke start:', message);
+  }
+}, [state.websocket, state.isConnected, state.settings, state.userId]);
+
+const sendStrokePoint = useCallback((strokeId: string, point: Point) => {
+  const message = {
+    type: "stroke:point",
+    payload: {
+      strokeId: strokeId,
+      point: point,
+      userId: state.userId,
+      timestamp: Date.now()
+    }
+  };
+  
+  if (state.websocket && state.isConnected) {
+    state.websocket.send(JSON.stringify(message));
+    console.log('Sent stroke point:', message);
+  }
+}, [state.websocket, state.isConnected, state.userId]);
+
+const sendStrokeFinish = useCallback((strokeId: string) => {
+  const message = {
+    type: "stroke:finish",
+    payload: {
+      strokeId: strokeId,
+      userId: state.userId,
+      timestamp: Date.now()
+    }
+  };
+  
+  if (state.websocket && state.isConnected) {
+    state.websocket.send(JSON.stringify(message));
+    console.log('Sent stroke finish:', message);
+  }
+}, [state.websocket, state.isConnected, state.userId]);
+
+const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+  try {
+    const message = JSON.parse(event.data);
+    console.log('Received WebSocket message:', message);
+    
+    if (message.type === 'stroke:start') {
+      // Start new stroke for other user
+      const strokeData = message.payload;
+      console.log('Received stroke start:', strokeData);
+      
+      // Create new stroke in WASM for preview
+      const wasmStroke: WASMStroke = {
+        points: [],
+        color: strokeData.color,
+        thickness: strokeData.thickness
+      };
+      
+      wasmEngine.addStroke(wasmStroke);
+      dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
+      
+    } else if (message.type === 'stroke:point') {
+      // Add point to existing stroke
+      const { strokeId, point } = message.payload;
+      console.log('Received stroke point:', { strokeId, point });
+      
+      // Add point to the last stroke in WASM
+      const strokeIndex = wasmEngine.getStrokes().length - 1;
+      if (strokeIndex >= 0) {
+        wasmEngine.addPointToStroke(strokeIndex, point);
+        dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
+      }
+      
+    } else if (message.type === 'stroke:finish') {
+      // Finish stroke
+      const { strokeId } = message.payload;
+      console.log('Received stroke finish:', strokeId);
+      
+      // Stroke is already complete in WASM, just update display
+      dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
+      
+    } else if (message.type === 'stroke:add') {
+      // Keep existing logic for backward compatibility
+      const strokeData = message.payload.stroke;
+      
+      // Convert server JSON format back to WASMStroke
+      const wasmStroke: WASMStroke = {
+        points: strokeData.points,
+        color: strokeData.color,
+        thickness: strokeData.thickness
+      };
+      
+      // Add to WASM engine
+      wasmEngine.addStroke(wasmStroke);
+      
+      // Update React state
+      dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
+      
+      console.log('Added received stroke to WASM engine');
+    }
+  } catch (error) {
+    console.error('Failed to handle WebSocket message:', error);
+  }
+}, [wasmEngine]);
+
+
+  // Set WebSocket message handler when WASM is loaded
+  React.useEffect(() => {
+    if (state.websocket && state.isConnected && isLoaded) {
+      state.websocket.onmessage = handleWebSocketMessage;
+      console.log('WebSocket message handler set');
+    }
+  }, [state.websocket, state.isConnected, isLoaded, handleWebSocketMessage]);
+
   // Tool management
   const setActiveTool = useCallback((toolType: ToolType) => {
     console.log('setActiveTool called with:', toolType)
@@ -360,7 +584,12 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
         thickness: state.settings.thickness
       }
     });
-  }, [isLoaded, wasmEngine, state.settings]);
+    
+    // Send stroke start via WebSocket
+    const strokeId = crypto.randomUUID();
+    dispatch({ type: 'SET_CURRENT_STROKE_ID', payload: strokeId });
+    sendStrokeStart(point);
+  }, [isLoaded, wasmEngine, state.settings, sendStrokeStart]);
   
   const continueDrawing = useCallback(async (point: Point) => {
     console.log('continueDrawing called with point:', point, 'current stroke points:', state.currentStroke?.points.length || 0)
@@ -405,7 +634,12 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
         thickness: state.currentStroke.thickness
       }
     });
-  }, [isLoaded, wasmEngine, state.currentStroke]);
+    
+    // Send point update via WebSocket
+    if (state.currentStrokeId) {
+      sendStrokePoint(state.currentStrokeId, point);
+    }
+  }, [isLoaded, wasmEngine, state.currentStroke, state.currentStrokeId, sendStrokePoint]);
   
   const finishDrawing = useCallback(() => {
     console.log('finishDrawing called, current stroke points:', state.currentStroke?.points.length || 0)
@@ -424,10 +658,16 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
       }
     }
     
+    // Send stroke finish via WebSocket
+    if (state.currentStrokeId) {
+      sendStrokeFinish(state.currentStrokeId);
+      dispatch({ type: 'SET_CURRENT_STROKE_ID', payload: null });
+    }
+    
     // Clear current stroke
     console.log('Clearing current stroke')
     dispatch({ type: 'SET_CURRENT_STROKE', payload: null });
-  }, [state.currentStroke, wasmEngine]);
+  }, [state.currentStroke, wasmEngine, state.currentStrokeId, sendStrokeFinish]);
   
   // Eraser operations
   const eraseAtPoint = useCallback(async (point: Point) => {
@@ -538,7 +778,14 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({ children
     clearCanvas,
     exportCanvas,
     triggerStrokeUpdate,
-    syncStrokesFromWasm
+    syncStrokesFromWasm,
+    connectWebSocket,
+    strokeToJSON,
+    sendStrokeViaWebSocket,
+    handleWebSocketMessage,
+    sendStrokeStart,
+    sendStrokePoint,
+    sendStrokeFinish
   };
   
   return (
