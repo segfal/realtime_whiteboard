@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# WebAssembly build script using Emscripten
-set -x
+
 emcc -std=c++17 \
      -Iglm \
      -Isrc \

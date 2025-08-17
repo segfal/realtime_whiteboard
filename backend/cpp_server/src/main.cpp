@@ -68,7 +68,22 @@ int main() {
             try {
                 json msg = json::parse(message);
                 
-                if (msg["type"] == "stroke:add") {
+                if (msg["type"] == "stroke:start") {
+                    // Broadcast stroke start
+                    std::cout << "Received stroke start" << std::endl;
+                    ws->publish("whiteboard", message, opCode);
+                    
+                } else if (msg["type"] == "stroke:point") {
+                    // Broadcast point update
+                    std::cout << "Received stroke point" << std::endl;
+                    ws->publish("whiteboard", message, opCode);
+                    
+                } else if (msg["type"] == "stroke:finish") {
+                    // Broadcast stroke finish
+                    std::cout << "Received stroke finish" << std::endl;
+                    ws->publish("whiteboard", message, opCode);
+                    
+                } else if (msg["type"] == "stroke:add") {
                     // Store the stroke
                     strokes.push_back(msg["payload"]["stroke"]);
                     std::cout << "Total strokes: " << strokes.size() << std::endl;
@@ -121,4 +136,5 @@ int main() {
     }).run();
     
     return 0;
+
 } 
