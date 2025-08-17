@@ -15,3 +15,4 @@ struct Stroke {
     Stroke(const Color& color = Color(), float thickness = 2.0f) : color(color), thickness(thickness),isEraser(false) {}
     
 };
+

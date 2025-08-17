@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# WebAssembly build script using Emscripten
-# Make sure to source emsdk environment first:
-# source emsdk/emsdk_env.sh
 
 emcc -std=c++17 \
      -Iglm \
@@ -21,6 +18,7 @@ emcc -std=c++17 \
 
 # Copy to frontend/public if build succeeded
 if [ $? -eq 0 ]; then
+  mkdir -p ../frontend/public/
   cp build/drawing_engine.* ../frontend/public/
   echo "Copied build/drawing_engine.* to ../frontend/public/"
 else

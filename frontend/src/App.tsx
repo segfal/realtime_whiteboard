@@ -62,5 +62,3 @@ const App: React.FC = () => {
     </WhiteboardProvider>
   )
 }
-
-export default App

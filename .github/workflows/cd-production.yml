@@ -1,0 +1,85 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '20.19.0'
+  Emscripten_VERSION: '3.1.45'
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+        
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v13
+      with:
+        version: ${{ env.Emscripten_VERSION }}
+        
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+      
+    - name: Build frontend
+      working-directory: ./frontend
+      env:
+        VITE_API_URL: 
+        VITE_ENVIRONMENT: production
+      run: npm run build
+      
+    - name: Build WebAssembly backend
+      working-directory: ./backend
+      run: |
+        source $EMSDK/emsdk_env.sh
+        ./scripts/build_wasm.sh
+        
+    - name: Create release tag
+      run: |
+        VERSION=${GITHUB_REF#refs/heads/}
+        git tag -a "v$VERSION" -m "Release version $VERSION"
+        git push origin "v$VERSION"
+        
+    - name: Deploy to production
+      run: |
+        # Add your production deployment commands here
+        echo "Deploying to production..."
+        # Example: AWS S3, CloudFront, or other hosting services
+    
+
+    - name: Run smoke tests
+      run: |
+        # Add smoke tests to verify deployment
+        echo "Running smoke tests..."
+        # curl -f https://your-production-url.com/health
+        
+    - name: Notify successful deployment
+      if: success()
+      run: |
+        echo "Production deployment successful!"
+        # Add success notification logic
+        
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        echo "Production deployment failed! Initiating rollback..."
+        # Add rollback logic
