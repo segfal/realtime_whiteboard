@@ -170,3 +170,4 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
 - **Optimization:** Could batch points or throttle updates
 - **Scalability:** Current design works for 2-5 users
 - **Memory:** WASM engine stores all strokes in memory
+

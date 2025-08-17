@@ -2,7 +2,7 @@
 
 # WebAssembly build script using Emscripten
 # Make sure to source emsdk environment first:
-# source ../emsdk/emsdk_env.sh
+# source emsdk/emsdk_env.sh
 
 emcc -std=c++17 \
      -Iglm \

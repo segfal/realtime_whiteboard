@@ -7,3 +7,9 @@
 [submodule "backend/gpuweb"]
 	path = backend/gpuweb
 	url = https://github.com/gpuweb/gpuweb.git
+[submodule "backend/cpp_server/build/backend/cpp_server/vendor/uWebSockets"]
+	path = backend/cpp_server/build/backend/cpp_server/vendor/uWebSockets
+	url = https://github.com/uNetworking/uWebSockets.git
+[submodule "backend/cpp_server/build/backend/cpp_server/vendor/json"]
+	path = backend/cpp_server/build/backend/cpp_server/vendor/json
+	url = https://github.com/nlohmann/json.git
