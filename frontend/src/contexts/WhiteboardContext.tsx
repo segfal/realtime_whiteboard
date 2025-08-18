@@ -725,3 +725,12 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
     </WhiteboardContext.Provider>
   );
 };
+
+// Custom hook to use the whiteboard context
+export const useWhiteboard = (): WhiteboardContextType => {
+  const context = useContext(WhiteboardContext);
+  if (context === undefined) {
+    throw new Error('useWhiteboard must be used within a WhiteboardProvider');
+  }
+  return context;
+};
