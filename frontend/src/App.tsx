@@ -1,8 +1,7 @@
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
-import { WhiteboardProvider} from './contexts/WhiteboardContext'
-import { useWhiteboard } from './contexts/ctx'
-
+import { WebSocketStatus } from './components/WebSocketStatus'
+import { WhiteboardProvider, useWhiteboard } from './contexts/WhiteboardContext'
 import type { ToolType } from './types/tool'
 import './App.css'
 
@@ -25,6 +24,7 @@ const AppContent: React.FC = () => {
   return (
     <div className="App">
       <h1>Whiteboard</h1>
+      <WebSocketStatus />
       <div style={{ 
         position: 'fixed', 
         top: '20px', 
@@ -62,5 +62,3 @@ const App: React.FC = () => {
     </WhiteboardProvider>
   )
 }
-
-export default App
