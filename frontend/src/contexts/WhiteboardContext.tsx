@@ -1,43 +1,12 @@
-import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
 import { useWASM } from '../hooks/useWasm';
 import { ToolManager } from '../tools/ToolManager';
 import type { ToolType, ToolSettings, DrawingTool } from '../types/tool';
 import type { WASMStroke, WASMShape, WASMPoint } from '../types/wasm';
 import type { Point, Stroke } from '../interfaces/canvas';
 import { logger, ToolDebugger, PerformanceTracker } from '../utils/debug';
+import type { WhiteboardContextType, WhiteboardState } from './types';
 
-// State interface for the whiteboard
-interface WhiteboardState {
-
-  // WebSocket State
-  websocket: WebSocket | null;
-  isConnected: boolean;
-  userId: string;
-  currentStrokeId: string | null;
-
-  // Tool management
-  activeTool: DrawingTool;
-  settings: ToolSettings;
-  allTools: DrawingTool[];
-  
-  // Drawing state
-  currentStroke: Stroke | null;
-  strokes: Stroke[];
-  selectedStrokes: Set<number>;
-  previewShape: Stroke | null;
-  
-  // UI state
-  isDragging: boolean;
-  dragStart: Point | null;
-  exportFormat: 'png' | 'svg';
-  
-  // WASM state
-  isWasmLoaded: boolean;
-  wasmError: string | null;
-  
-  // Performance tracking
-  strokeUpdateTrigger: number;
-}
 
 // Action types for the reducer
 type WhiteboardAction =
@@ -87,7 +56,7 @@ localStorage.setItem('userId', initialState.userId);
 // Reducer function for state management
 function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): WhiteboardState {
   switch (action.type) {
-    case 'SET_ACTIVE_TOOL':
+    case 'SET_ACTIVE_TOOL': {
       console.log('SET_ACTIVE_TOOL reducer called with:', action.payload)
       console.log('Current allTools:', state.allTools.map(t => t.id))
       const foundTool = state.allTools.find(tool => tool.id === action.payload);
@@ -101,7 +70,7 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
         ...state,
         activeTool: toolToUse
       };
-    
+    }
     case 'UPDATE_SETTINGS':
       return {
         ...state,
@@ -194,44 +163,6 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
     default:
       return state;
   }
-}
-
-// Context interface
-interface WhiteboardContextType {
-  // State
-  state: WhiteboardState;
-  
-  // Tool management
-  setActiveTool: (toolType: ToolType) => void;
-  updateSettings: (settings: Partial<ToolSettings>) => void;
-  
-  // Drawing operations
-  startDrawing: (point: Point) => void;
-  continueDrawing: (point: Point) => void;
-  finishDrawing: () => void;
-  
-  // Eraser operations
-  eraseAtPoint: (point: Point) => void;
-  
-  // Selection operations
-  selectStrokes: (indices: Set<number>) => void;
-  moveSelectedStrokes: (dx: number, dy: number) => void;
-  deleteSelectedStrokes: () => void;
-  
-  // Canvas operations
-  clearCanvas: () => void;
-  exportCanvas: (format: 'png' | 'svg') => void;
-  
-  // Utility
-  triggerStrokeUpdate: () => void;
-  syncStrokesFromWasm: () => void;
-  connectWebSocket: () => void;
-  strokeToJSON: (wasmStroke: WASMStroke) => any;
-  sendStrokeViaWebSocket: (strokeData: any) => void;
-  handleWebSocketMessage: (event: MessageEvent) => void;
-  sendStrokeStart: (point: Point) => void;
-  sendStrokePoint: (strokeId: string, point: Point) => void;
-  sendStrokeFinish: (strokeId: string) => void;
 }
 
 // Create the context
@@ -563,7 +494,7 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
         color: state.settings.color,
         thickness: state.settings.thickness,
         operation: 'start'
-      }, wasmStrokes, []);
+      });
       
       wasmEngine.addStroke(wasmStroke);
       console.log('Stroke added to WASM, triggering update')
@@ -615,7 +546,7 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
           strokeIndex,
           operation: 'addPoint',
           totalPoints: state.currentStroke.points.length + 1
-        }, wasmStrokes, []);
+        });
         
         PerformanceTracker.end('strokePointAddition');
       }
@@ -695,7 +626,7 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
             eraserSize,
             strokeIndex: i,
             strokeData: reactStroke
-          }, wasmStrokes, []);
+          });
           
           wasmEngine.removeStroke(i);
           dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
@@ -794,13 +725,3 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
     </WhiteboardContext.Provider>
   );
 };
-
-// Custom hook to use the whiteboard context
-export const useWhiteboard = (): WhiteboardContextType => {
-  const context = useContext(WhiteboardContext);
-  if (context === undefined) {
-    throw new Error('useWhiteboard must be used within a WhiteboardProvider');
-  }
-  return context;
-}; 
-
