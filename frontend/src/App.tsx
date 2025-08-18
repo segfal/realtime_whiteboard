@@ -1,9 +1,11 @@
 import { Canvas } from './components/Canvas'
 import { Toolbar } from './components/Toolbar'
 import { WebSocketStatus } from './components/WebSocketStatus'
-import { WhiteboardProvider, useWhiteboard } from './contexts/WhiteboardContext'
+import { WhiteboardProvider } from './contexts/WhiteboardContext'
+
 import type { ToolType } from './types/tool'
 import './App.css'
+import { useWhiteboard } from './contexts/ctx'
 
 // Inner App component that uses the context
 const AppContent: React.FC = () => {
@@ -55,7 +57,7 @@ const AppContent: React.FC = () => {
 }
 
 // Main App component that provides the context
-const App: React.FC = () => {
+export const App: React.FC = () => {
   return (
     <WhiteboardProvider>
       <AppContent />
