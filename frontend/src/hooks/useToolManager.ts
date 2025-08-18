@@ -42,7 +42,7 @@ export const useToolManager = () => {
         toolManager.handlePointerUp(event, canvas);
     }, [toolManager]);
     
-    const activeTool = useMemo(() => toolManager.getActiveTool(), [toolManager, state.activeTool]);
+    const activeTool = useMemo(() => toolManager.getActiveTool(), [toolManager]);
     const allTools = useMemo(() => toolManager.getAllTools(), [toolManager]);
     
     return {
