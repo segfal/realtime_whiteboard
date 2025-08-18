@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
+import React, {  useReducer, useCallback, type ReactNode } from 'react';
 import { useWASM } from '../hooks/useWasm';
 import { ToolManager } from '../tools/ToolManager';
 import type { ToolType, ToolSettings, DrawingTool } from '../types/tool';
@@ -6,6 +6,7 @@ import type { WASMStroke, WASMShape, WASMPoint } from '../types/wasm';
 import type { Point, Stroke } from '../interfaces/canvas';
 import { logger, ToolDebugger, PerformanceTracker } from '../utils/debug';
 import type { WhiteboardContextType, WhiteboardState } from './types';
+import { WhiteboardContext } from './ctx';
 
 
 // Action types for the reducer
@@ -165,8 +166,7 @@ function whiteboardReducer(state: WhiteboardState, action: WhiteboardAction): Wh
   }
 }
 
-// Create the context
-const WhiteboardContext = createContext<WhiteboardContextType | undefined>(undefined);
+
 
 // Provider component
 interface WhiteboardProviderProps {
@@ -726,11 +726,3 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
   );
 };
 
-// Custom hook to use the whiteboard context
-export const useWhiteboard = (): WhiteboardContextType => {
-  const context = useContext(WhiteboardContext);
-  if (context === undefined) {
-    throw new Error('useWhiteboard must be used within a WhiteboardProvider');
-  }
-  return context;
-};

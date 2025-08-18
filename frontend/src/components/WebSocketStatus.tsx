@@ -1,5 +1,5 @@
 import React from 'react';
-import { useWhiteboard } from '../contexts/WhiteboardContext';
+import { useWhiteboard } from '../contexts/ctx';
 
 export const WebSocketStatus: React.FC = () => {
   const { state } = useWhiteboard();

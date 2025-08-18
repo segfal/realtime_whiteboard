@@ -57,7 +57,7 @@ const AppContent: React.FC = () => {
 }
 
 // Main App component that provides the context
-const App: React.FC = () => {
+export const App: React.FC = () => {
   return (
     <WhiteboardProvider>
       <AppContent />
