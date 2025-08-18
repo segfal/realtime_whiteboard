@@ -101,10 +101,20 @@ export class EventDebugger {
     }
   }
 }
+interface WASMModule {
+  DrawingEngine: unknown;
+  engine: unknown;
+  isReady: () => boolean;
+  [key: string]: unknown;
+}
+interface WASMEngine {
+  getStrokes: () => unknown[];
+  [key: string]: unknown;
+}
 
 // WASM debugging utilities
 export class WASMDebugger {
-  static logWASMLoad(module: any) {
+  static logWASMLoad(module: WASMModule) {
     if (process.env.NODE_ENV === 'development') {
       console.log('[WASM_LOAD] Module loaded:', {
         hasDrawingEngine: !!module.DrawingEngine,
@@ -117,7 +127,7 @@ export class WASMDebugger {
     }
   }
   
-  static logEngineState(engine: any) {
+  static logEngineState(engine: WASMEngine) {
     if (process.env.NODE_ENV === 'development') {
       if (!engine) {
         console.log('[WASM_STATE] Engine is null or undefined');
