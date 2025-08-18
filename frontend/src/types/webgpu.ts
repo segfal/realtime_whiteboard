@@ -18,7 +18,7 @@ declare global {
   interface GPUBuffer {}
   
   interface GPUCanvasContext {
-    configure(config: any): void
+    configure(config: unknown): void
   }
   
   type GPUTextureFormat = string
