@@ -495,8 +495,6 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
         thickness: state.settings.thickness,
         operation: 'start'
       });
-      });
-      
       wasmEngine.addStroke(wasmStroke);
       console.log('Stroke added to WASM, triggering update')
       dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
@@ -548,7 +546,7 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
           operation: 'addPoint',
           totalPoints: state.currentStroke.points.length + 1
         });
-        });
+       
         
         PerformanceTracker.end('strokePointAddition');
       }
@@ -629,8 +627,7 @@ const handleWebSocketMessage = useCallback((event: MessageEvent) => {
             strokeIndex: i,
             strokeData: reactStroke
           });
-          });
-          
+          console.log('Removing stroke:', i);
           wasmEngine.removeStroke(i);
           dispatch({ type: 'TRIGGER_STROKE_UPDATE' });
           break;
