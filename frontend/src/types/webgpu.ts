@@ -2,31 +2,33 @@
 declare global {
   interface Navigator {
     gpu?: {
-      requestAdapter(): Promise<GPUAdapter | null>
-      getPreferredCanvasFormat(): GPUTextureFormat
-    }
+      requestAdapter(): Promise<GPUAdapter | null>;
+      getPreferredCanvasFormat(): GPUTextureFormat;
+    };
   }
-  
+
   interface GPUAdapter {
-    requestDevice(): Promise<GPUDevice>
+    requestDevice(): Promise<GPUDevice>;
   }
-  
+
   interface GPUDevice {
-    createBuffer(): GPUBuffer
+    createBuffer(): GPUBuffer;
   }
-  
-  interface GPUBuffer {}
-  
+
+  interface GPUBuffer {
+    // WebGPU buffer interface - intentionally empty as it's a placeholder
+  }
+
   interface GPUCanvasContext {
-    configure(config: unknown): void
+    configure(config: unknown): void;
   }
-  
-  type GPUTextureFormat = string
+
+  type GPUTextureFormat = string;
 }
 
 export interface WebGPUState {
-  adapter: GPUAdapter | null
-  device: GPUDevice | null
-  context: GPUCanvasContext | null
-  format: GPUTextureFormat | null
-} 
+  adapter: GPUAdapter | null;
+  device: GPUDevice | null;
+  context: GPUCanvasContext | null;
+  format: GPUTextureFormat | null;
+}
