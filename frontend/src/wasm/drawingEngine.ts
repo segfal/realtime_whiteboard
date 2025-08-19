@@ -292,3 +292,4 @@ export const testWASM = async () => {
     return false;
   }
 };
+
