@@ -39,7 +39,6 @@ export interface WASMStroke {
 }
   
 export interface DrawingEngineWASM {
-    new(): DrawingEngineWASM;
     
     // New polymorphic shape methods
     addShape(shape: WASMShape): void;

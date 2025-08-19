@@ -302,7 +302,7 @@ const strokeToJSON = useCallback((wasmStroke: WASMStroke) => {
   };
 }, [state.userId]);
 
-const sendStrokeViaWebSocket = useCallback((strokeData: any) => {
+const sendStrokeViaWebSocket = useCallback((strokeData: unknown) => {
   if (state.websocket && state.isConnected) {
     try {
       const message = JSON.stringify(strokeData);

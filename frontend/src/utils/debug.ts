@@ -108,8 +108,14 @@ interface WASMModule {
   [key: string]: unknown;
 }
 interface WASMEngine {
-  getStrokes: () => unknown[];
+  getStrokes: () => WASMStroke[];
   [key: string]: unknown;
+}
+interface WASMStroke {
+  points: unknown[];
+  color: unknown;
+  thickness: number;
+  isEraser: boolean;
 }
 
 // WASM debugging utilities
@@ -138,7 +144,7 @@ export class WASMDebugger {
         const strokes = engine.getStrokes ? engine.getStrokes() : [];
         console.log('[WASM_STATE] Engine state:', {
           strokeCount: strokes.length,
-          strokes: strokes.map((stroke: any, index: number) => ({
+          strokes: strokes.map((stroke: WASMStroke, index: number) => ({
             index,
             pointCount: stroke.points?.length || 0,
             color: stroke.color,
@@ -151,7 +157,7 @@ export class WASMDebugger {
     }
   }
   
-  static logStrokeOperation(operation: string, stroke: any, index?: number) {
+  static logStrokeOperation(operation: string, stroke: WASMStroke, index?: number) {
     if (process.env.NODE_ENV === 'development') {
       console.log(`[WASM_${operation.toUpperCase()}]`, {
         index,
