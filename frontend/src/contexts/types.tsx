@@ -65,8 +65,8 @@ export interface WhiteboardContextType {
   triggerStrokeUpdate: () => void;
   syncStrokesFromWasm: () => void;
   connectWebSocket: () => void;
-  strokeToJSON: (wasmStroke: WASMStroke) => any;
-  sendStrokeViaWebSocket: (strokeData: any) => void;
+  strokeToJSON: (wasmStroke: WASMStroke) => unknown;
+  sendStrokeViaWebSocket: (strokeData: unknown) => void;
   handleWebSocketMessage: (event: MessageEvent) => void;
   sendStrokeStart: (point: Point) => void;
   sendStrokePoint: (strokeId: string, point: Point) => void;
