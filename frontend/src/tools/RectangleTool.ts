@@ -1,96 +1,96 @@
-import type { DrawingTool, ToolSettings } from '../types/tool';
-import type { WASMShape, WASMRectangleShape, WASMPoint } from '../types/wasm';
-import type { SelectionBounds } from '../interfaces/canvas';
+import type { DrawingTool, ToolSettings } from "../types/tool";
+import type { WASMShape, WASMRectangleShape, WASMPoint } from "../types/wasm";
+import type { SelectionBounds } from "../interfaces/canvas";
 
 export class RectangleTool implements DrawingTool {
-    id = 'rectangle';
-    name = 'Rectangle';
-    icon = '⬜';
-    cursor = 'crosshair';
-    
-    public isActive: boolean = false;
-    public color = { r: 0, g: 0, b: 0, a: 1 };
-    public thickness = 2;
-    
-    private settings: ToolSettings;
-    private startPoint: WASMPoint | null = null;
-    private currentPoint: WASMPoint | null = null;
-    private _isDrawing: boolean = false;
+  id = "rectangle";
+  name = "Rectangle";
+  icon = "⬜";
+  cursor = "crosshair";
 
-    constructor(settings: ToolSettings) {
-        this.settings = settings;
-        this.color = settings.color;
-        this.thickness = settings.thickness;
-    }
+  public isActive: boolean = false;
+  public color = { r: 0, g: 0, b: 0, a: 1 };
+  public thickness = 2;
 
-    updateSettings(settings: ToolSettings): void {
-        this.settings = settings;
-        this.color = settings.color;
-        this.thickness = settings.thickness;
-    }
+  private settings: ToolSettings;
+  private startPoint: WASMPoint | null = null;
+  private currentPoint: WASMPoint | null = null;
+  private _isDrawing: boolean = false;
 
-    // Remove the event handlers since they're handled by Canvas component
-    onPointerDown(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
-        // Event handling is done by Canvas component
-    }
+  constructor(settings: ToolSettings) {
+    this.settings = settings;
+    this.color = settings.color;
+    this.thickness = settings.thickness;
+  }
 
-    onPointerMove(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
-        // Event handling is done by Canvas component
-    }
+  updateSettings(settings: ToolSettings): void {
+    this.settings = settings;
+    this.color = settings.color;
+    this.thickness = settings.thickness;
+  }
 
-    onPointerUp(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
-        // Event handling is done by Canvas component
-    }
+  // Remove the event handlers since they're handled by Canvas component
+  onPointerDown(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
+    // Event handling is done by Canvas component
+  }
 
-    startDrawing(point: WASMPoint): void {
-        this.startPoint = point;
-        this.currentPoint = point;
-        this._isDrawing = true;
-    }
+  onPointerMove(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
+    // Event handling is done by Canvas component
+  }
 
-    continueDrawing(point: WASMPoint): void {
-        this.currentPoint = point;
-    }
+  onPointerUp(_event: PointerEvent, _canvas: HTMLCanvasElement): void {
+    // Event handling is done by Canvas component
+  }
 
-    finishDrawing(): WASMShape | null {
-        if (!this.startPoint || !this.currentPoint) return null;
+  startDrawing(point: WASMPoint): void {
+    this.startPoint = point;
+    this.currentPoint = point;
+    this._isDrawing = true;
+  }
 
-        const shape: WASMRectangleShape = {
-            type: 'rectangle',
-            topLeft: {
-                x: Math.min(this.startPoint.x, this.currentPoint.x),
-                y: Math.min(this.startPoint.y, this.currentPoint.y)
-            },
-            bottomRight: {
-                x: Math.max(this.startPoint.x, this.currentPoint.x),
-                y: Math.max(this.startPoint.y, this.currentPoint.y)
-            },
-            color: this.color,
-            thickness: this.thickness
-        };
+  continueDrawing(point: WASMPoint): void {
+    this.currentPoint = point;
+  }
 
-        this.startPoint = null;
-        this.currentPoint = null;
-        this._isDrawing = false;
-        return shape;
-    }
+  finishDrawing(): WASMShape | null {
+    if (!this.startPoint || !this.currentPoint) return null;
 
-    getSettings(): ToolSettings {
-        return { ...this.settings };
-    }
+    const shape: WASMRectangleShape = {
+      type: "rectangle",
+      topLeft: {
+        x: Math.min(this.startPoint.x, this.currentPoint.x),
+        y: Math.min(this.startPoint.y, this.currentPoint.y),
+      },
+      bottomRight: {
+        x: Math.max(this.startPoint.x, this.currentPoint.x),
+        y: Math.max(this.startPoint.y, this.currentPoint.y),
+      },
+      color: this.color,
+      thickness: this.thickness,
+    };
 
-    isDrawing(): boolean {
-        return this._isDrawing;
-    }
+    this.startPoint = null;
+    this.currentPoint = null;
+    this._isDrawing = false;
+    return shape;
+  }
 
-    getCurrentBounds(): SelectionBounds | null {
-        if (!this.startPoint || !this.currentPoint) return null;
-        
-        return {
-            x1: Math.min(this.startPoint.x, this.currentPoint.x),
-            y1: Math.min(this.startPoint.y, this.currentPoint.y),
-            x2: Math.max(this.startPoint.x, this.currentPoint.x),
-            y2: Math.max(this.startPoint.y, this.currentPoint.y)
-        };
-    }
-} 
+  getSettings(): ToolSettings {
+    return { ...this.settings };
+  }
+
+  isDrawing(): boolean {
+    return this._isDrawing;
+  }
+
+  getCurrentBounds(): SelectionBounds | null {
+    if (!this.startPoint || !this.currentPoint) return null;
+
+    return {
+      x1: Math.min(this.startPoint.x, this.currentPoint.x),
+      y1: Math.min(this.startPoint.y, this.currentPoint.y),
+      x2: Math.max(this.startPoint.x, this.currentPoint.x),
+      y2: Math.max(this.startPoint.y, this.currentPoint.y),
+    };
+  }
+}
