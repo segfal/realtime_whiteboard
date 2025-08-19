@@ -7,6 +7,11 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit",
+    "check": "npm run lint && npm run type-check && npm run format:check",
+    "check:fix": "npm run lint:fix && npm run format",
+    "pre-commit": "npm run check",
     "preview": "vite preview",
     "debug": "vite --mode development --debug",
     "debug:chrome": "vite --mode development --debug --port 5173",
@@ -19,8 +24,8 @@
     "debug:view": "./scripts/view-debug-logs.sh",
     "test": "vitest run",
     "test:watch": "vitest",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format": "npx prettier --write .",
+    "format:check": "npx prettier --check ."
   },
   "dependencies": {
     "@webgpu/types": "^0.1.64",
