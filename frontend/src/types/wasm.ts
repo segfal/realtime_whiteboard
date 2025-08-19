@@ -38,21 +38,21 @@ export interface WASMStroke {
     thickness: number;
 }
   
-export abstract class DrawingEngineWASM {
+export interface DrawingEngineWASM {
     
     // New polymorphic shape methods
-    abstract addShape(shape: WASMShape): void;
-    abstract removeShape(index: number): void;
-    abstract moveShape(index: number, dx: number, dy: number): void;
+    addShape(shape: WASMShape): void;
+    removeShape(index: number): void;
+    moveShape(index: number, dx: number, dy: number): void;
     
     // Legacy methods for backward compatibility
-    abstract addStroke(stroke: WASMStroke): void;
-    abstract addPointToStroke(strokeIndex: number, point: WASMPoint): void;
-    abstract removeStroke(index: number): void;
-    abstract moveStroke(index: number, dx: number, dy: number): void;
+    addStroke(stroke: WASMStroke): void;
+    addPointToStroke(strokeIndex: number, point: WASMPoint): void;
+    removeStroke(index: number): void;
+    moveStroke(index: number, dx: number, dy: number): void;
     
     // Common methods
-    abstract clear(): void;
-    abstract getStrokes(): WASMStroke[];
-    abstract getVertexBufferData(): number[];
+    clear(): void;
+    getStrokes(): WASMStroke[];
+    getVertexBufferData(): number[];
 }
