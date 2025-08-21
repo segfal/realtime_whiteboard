@@ -13,7 +13,6 @@ from PIL import Image, ImageDraw
 import torch.nn.functional as F
 
 
-
 # ---------------- Dataset ---------------- #
 class QuickDrawDataset(Dataset):
     def __init__(self, files, label_map, img_size=64, limit_per_class=5000, transform=None):
