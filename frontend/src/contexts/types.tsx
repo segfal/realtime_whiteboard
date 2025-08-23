@@ -1,6 +1,6 @@
-import type { ToolType, ToolSettings, DrawingTool } from "../types/tool";
 import type { Point, Stroke } from "../interfaces/canvas";
-import type { WASMStroke } from "../types";
+import type { ChatState, WASMStroke, WebSocketMessage } from "../types";
+import type { DrawingTool, ToolSettings, ToolType } from "../types/tool";
 
 // State interface for the whiteboard
 export interface WhiteboardState {
@@ -32,7 +32,11 @@ export interface WhiteboardState {
 
   // Performance tracking
   strokeUpdateTrigger: number;
+
+  // Chat state
+  chat: ChatState;
 }
+
 // Context interface
 export interface WhiteboardContextType {
   // State
@@ -69,4 +73,13 @@ export interface WhiteboardContextType {
   sendStrokeStart: (point: Point) => void;
   sendStrokePoint: (strokeId: string, point: Point) => void;
   sendStrokeFinish: (strokeId: string) => void;
+
+  // Chat operations
+  sendChatMessage: (content: string) => void;
+  sendTypingStatus: (isTyping: boolean) => void;
+  clearChat: () => void;
+  markChatAsRead: () => void;
+  
+  // Enhanced WebSocket operations with proper typing
+  sendWebSocketMessage: (message: WebSocketMessage) => void;
 }
