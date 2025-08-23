@@ -1,41 +1,58 @@
 #!/bin/bash
 
-# Development script for realtime_whiteboard project
-# Builds backend and starts frontend development server
+# Development script - starts all components
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "🚀 Starting development environment..."
 
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+# Function to cleanup on exit
+cleanup() {
+    echo "🛑 Stopping all services..."
+    if [ ! -z "$SERVER_PID" ]; then
+        kill $SERVER_PID 2>/dev/null || true
+    fi
+    if [ ! -z "$FRONTEND_PID" ]; then
+        kill $FRONTEND_PID 2>/dev/null || true
+    fi
+    exit 0
 }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Set up signal handlers
+trap cleanup INT TERM
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Check if we're in the right directory
-if [[ ! -f "Makefile" ]]; then
-    print_error "This script must be run from the realtime_whiteboard root directory"
-    exit 1
+# Start WebSocket server with Docker
+echo "Starting WebSocket server..."
+cd websocket-server
+if [ -f "build/server" ]; then
+    echo "Using local build..."
+    ./build/server &
+    SERVER_PID=$!
+else
+    echo "Using Docker..."
+    docker-compose -f ../docker-compose.yml up websocket-server -d
+    SERVER_PID=$(docker-compose -f ../docker-compose.yml ps -q websocket-server)
 fi
+cd ..
 
-print_status "Starting development environment..."
+# Wait a moment for server to start
+sleep 2
 
-# Build backend
-print_status "Building backend..."
-make build-backend
+# Start frontend dev server
+echo "Starting frontend dev server..."
+cd frontend
+npm run dev &
+FRONTEND_PID=$!
+cd ..
 
-# Start frontend
-print_status "Starting frontend development server..."
-make run-frontend 
+echo "✅ Development environment started!"
+echo "WebSocket server PID: $SERVER_PID"
+echo "Frontend dev server PID: $FRONTEND_PID"
+echo ""
+echo "🌐 Frontend: http://localhost:3000"
+echo "🔌 WebSocket: ws://localhost:9000"
+echo ""
+echo "Press Ctrl+C to stop all services"
+
+# Wait for interrupt
+wait
