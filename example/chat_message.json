@@ -1,9 +1,0 @@
-{
-  "payload": {
-    "message": "Test message from C++ client",
-    "timestamp": 1754776186154,
-    "user": "CppTestClient",
-    "user_id": "cpp_test_user"
-  },
-  "type": "chat:message"
-}

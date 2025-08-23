@@ -93,7 +93,24 @@ int main() {
         }
     });
     dispatcher.on("chat:message", [&state](WS *ws, const json &msg, std::string_view raw, uWS::OpCode op){
-        state.add_chat(msg.value("payload", json::object()));
+        const auto &payload = msg.value("payload", json::object());
+        std::cout << "Processing chat message from user: " << payload.value("userId", "unknown") << std::endl;
+        std::cout << "Message content: " << payload.value("content", "no content") << std::endl;
+        // Add message to state
+        state.add_chat(payload);
+        // Broadcast to all clients
+        std::cout << "Broadcasting chat message to all clients..." << std::endl;
+        ws->publish("whiteboard", raw, op);
+        std::cout << "Chat message broadcast complete" << std::endl;
+    });
+    
+    dispatcher.on("chat:typing", [](WS *ws, const json &msg, std::string_view raw, uWS::OpCode op){
+        // Broadcast typing indicator
+        ws->publish("whiteboard", raw, op);
+    });
+    
+    dispatcher.on("user:join", [](WS *ws, const json &msg, std::string_view raw, uWS::OpCode op){
+        // Broadcast user joined
         ws->publish("whiteboard", raw, op);
     });
 
@@ -111,6 +128,7 @@ int main() {
         .open = [&state](auto *ws) {
             std::cout << "WebSocket connection opened" << std::endl;
             ws->subscribe("whiteboard");
+            std::cout << "Client subscribed to whiteboard topic" << std::endl;
 
             auto [strokes, chats] = state.snapshot();
 
@@ -134,6 +152,7 @@ int main() {
             std::cout << "Received message: " << message << std::endl;
             try {
                 json msg = json::parse(message);
+                std::cout << "Parsed message type: " << msg.value("type", "unknown") << std::endl;
                 dispatcher.dispatch(static_cast<WS*>(ws), msg, message, opCode);
             } catch (const json::exception &e) {
                 std::cerr << "JSON parse error: " << e.what() << std::endl;

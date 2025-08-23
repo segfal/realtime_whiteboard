@@ -1,15 +1,20 @@
-import React, { useReducer, useCallback, type ReactNode } from "react";
+import React, { useCallback, useReducer, type ReactNode } from "react";
 import { useWASM } from "../hooks/useWasm";
-import { ToolManager } from "../tools/ToolManager";
-import type { ToolType, ToolSettings, DrawingTool } from "../types/tool";
-import type { WASMStroke } from "../types/wasm";
 import type { Point, Stroke } from "../interfaces/canvas";
-import { logger, ToolDebugger, PerformanceTracker } from "../utils/debug";
-import type { WhiteboardContextType, WhiteboardState } from "./types";
+import { ToolManager } from "../tools/ToolManager";
+import type { ChatMessage, WASMStroke, WebSocketMessage } from "../types";
+import type { DrawingTool, ToolSettings, ToolType } from "../types/tool";
+import { logger, PerformanceTracker, ToolDebugger } from "../utils/debug";
 import { WhiteboardContext } from "./ctx";
+import type { WhiteboardContextType, WhiteboardState } from "./types";
 
 // Action types for the reducer
 type WhiteboardAction =
+  | { type: "ADD_CHAT_MESSAGE"; payload: ChatMessage }
+  | { type: "SET_CHAT_MESSAGES"; payload: ChatMessage[] }
+  | { type: "SET_TYPING_STATUS"; payload: { userId: string; isTyping: boolean } }
+  | { type: "CLEAR_CHAT" }
+  | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_ACTIVE_TOOL"; payload: ToolType }
   | { type: "UPDATE_SETTINGS"; payload: Partial<ToolSettings> }
   | { type: "SET_CURRENT_STROKE"; payload: Stroke | null }
@@ -30,7 +35,8 @@ type WhiteboardAction =
       type: "SET_WEBSOCKET_CONNECTED";
       payload: { websocket: WebSocket | null; isConnected: boolean };
     }
-  | { type: "SET_CURRENT_STROKE_ID"; payload: string | null };
+  | { type: "SET_CURRENT_STROKE_ID"; payload: string | null }
+  | { type: "MARK_CHAT_AS_READ" };
 
 // Initial state
 const initialState: WhiteboardState = {
@@ -55,6 +61,12 @@ const initialState: WhiteboardState = {
   isConnected: false,
   userId: localStorage.getItem("userId") || crypto.randomUUID(), //TODO:
   currentStrokeId: null,
+  chat: {
+    messages: [],
+    isTyping: false,
+    typingUsers: new Set(),
+    unreadCount: 0,
+  },
 };
 
 localStorage.setItem("userId", initialState.userId);
@@ -177,6 +189,66 @@ function whiteboardReducer(
       return {
         ...state,
         currentStrokeId: action.payload,
+      };
+
+    case "ADD_CHAT_MESSAGE":
+      console.log("Adding chat message to state:", action.payload);
+      console.log("Current chat messages count:", state.chat.messages.length);
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          messages: [...state.chat.messages, action.payload],
+          unreadCount: state.chat.unreadCount + 1,
+        },
+      };
+    case "SET_CHAT_MESSAGES":
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          messages: action.payload,
+        },
+      };
+    case "SET_TYPING_STATUS":
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          typingUsers: action.payload.isTyping
+            ? new Set([...state.chat.typingUsers, action.payload.userId])
+            : new Set(
+                Array.from(state.chat.typingUsers).filter(
+                  (userId: string) => userId !== action.payload.userId,
+                ),
+              ),
+        },
+      };
+    case "CLEAR_CHAT":
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          messages: [],
+          isTyping: false,
+          typingUsers: new Set(),
+        },
+      };
+    case "SET_UNREAD_COUNT":
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          unreadCount: action.payload,
+        },
+      };
+    case "MARK_CHAT_AS_READ":
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          unreadCount: 0,
+        },
       };
 
     default:
@@ -414,74 +486,160 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
   const handleWebSocketMessage = useCallback(
     (event: MessageEvent) => {
       try {
-        const message = JSON.parse(event.data);
+        const message: WebSocketMessage = JSON.parse(event.data);
         console.log("Received WebSocket message:", message);
 
-        if (message.type === "stroke:start") {
-          // Start new stroke for other user
-          const strokeData = message.payload;
-          console.log("Received stroke start:", strokeData);
+        switch (message.type) {
+          case "stroke:start": {
+            if (!isLoaded || !wasmEngine) break;
+            const strokeData = message.payload;
+            console.log("Received stroke start:", strokeData);
 
-          // Create new stroke in WASM for preview
-          const wasmStroke: WASMStroke = {
-            points: [],
-            color: strokeData.color,
-            thickness: strokeData.thickness,
-          };
+            const wasmStroke: WASMStroke = {
+              points: [],
+              color: strokeData.color,
+              thickness: strokeData.thickness,
+            };
 
-          wasmEngine.addStroke(wasmStroke);
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
-        } else if (message.type === "stroke:point") {
-          // Add point to existing stroke
-          const { strokeId, point } = message.payload;
-          console.log("Received stroke point:", { strokeId, point });
-
-          // Add point to the last stroke in WASM
-          const strokeIndex = wasmEngine.getStrokes().length - 1;
-          if (strokeIndex >= 0) {
-            wasmEngine.addPointToStroke(strokeIndex, point);
+            wasmEngine.addStroke(wasmStroke);
             dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            break;
           }
-        } else if (message.type === "stroke:finish") {
-          // Finish stroke
-          const { strokeId } = message.payload;
-          console.log("Received stroke finish:", strokeId);
 
-          // Stroke is already complete in WASM, just update display
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
-        } else if (message.type === "stroke:add") {
-          // Keep existing logic for backward compatibility
-          const strokeData = message.payload.stroke;
+          case "stroke:point": {
+            if (!isLoaded || !wasmEngine) break;
+            const { strokeId, point } = message.payload;
+            console.log("Received stroke point:", { strokeId, point });
 
-          // Convert server JSON format back to WASMStroke
-          const wasmStroke: WASMStroke = {
-            points: strokeData.points,
-            color: strokeData.color,
-            thickness: strokeData.thickness,
-          };
+            const strokeIndex = wasmEngine.getStrokes().length - 1;
+            if (strokeIndex >= 0) {
+              wasmEngine.addPointToStroke(strokeIndex, point);
+              dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            }
+            break;
+          }
 
-          // Add to WASM engine
-          wasmEngine.addStroke(wasmStroke);
+          case "stroke:finish": {
+            if (!isLoaded || !wasmEngine) break;
+            const { strokeId } = message.payload;
+            console.log("Received stroke finish:", strokeId);
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            break;
+          }
 
-          // Update React state
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+          case "stroke:add": {
+            if (!isLoaded || !wasmEngine) break;
+            const strokeData = message.payload.stroke;
+            const wasmStroke: WASMStroke = {
+              points: strokeData.points,
+              color: strokeData.color,
+              thickness: strokeData.thickness,
+            };
 
-          console.log("Added received stroke to WASM engine");
+            wasmEngine.addStroke(wasmStroke);
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            break;
+          }
+
+          case "chat:sync": {
+            const { chatHistory } = message.payload;
+            console.log("Received chat sync:", chatHistory);
+            dispatch({ type: "SET_CHAT_MESSAGES", payload: chatHistory });
+            break;
+          }
+
+          case "chat:message": {
+            console.log("Received chat message:", message.payload);
+            const chatMessage: ChatMessage = {
+              id: crypto.randomUUID(),
+              userId: message.payload.userId,
+              username: message.payload.username,
+              content: message.payload.content,
+              timestamp: message.payload.timestamp,
+              type: 'text'
+            };
+            console.log("Dispatching chat message:", chatMessage);
+            dispatch({ type: "ADD_CHAT_MESSAGE", payload: chatMessage });
+            break;
+          }
+
+          case "chat:typing": {
+            dispatch({ 
+              type: "SET_TYPING_STATUS", 
+              payload: { 
+                userId: message.payload.userId, 
+                isTyping: message.payload.isTyping 
+              } 
+            });
+            break;
+          }
+
+          case "user:join": {
+            const systemMessage: ChatMessage = {
+              id: crypto.randomUUID(),
+              userId: 'system',
+              username: 'System',
+              content: `${message.payload.username} joined the session`,
+              timestamp: message.payload.timestamp,
+              type: 'system'
+            };
+            dispatch({ type: "ADD_CHAT_MESSAGE", payload: systemMessage });
+            break;
+          }
+
+          case "user:leave": {
+            const systemMessage: ChatMessage = {
+              id: crypto.randomUUID(),
+              userId: 'system',
+              username: 'System',
+              content: `A user left the session`,
+              timestamp: message.payload.timestamp,
+              type: 'system'
+            };
+            dispatch({ type: "ADD_CHAT_MESSAGE", payload: systemMessage });
+            break;
+          }
+
+          case "board:sync": {
+            if (!isLoaded || !wasmEngine) break;
+            const { strokes } = message.payload;
+            console.log("Received board sync:", strokes.length, "strokes");
+            
+            // Clear existing strokes and add synced strokes
+            wasmEngine.clear();
+            strokes.forEach((strokeData) => {
+              const wasmStroke: WASMStroke = {
+                points: strokeData.points,
+                color: strokeData.color,
+                thickness: strokeData.thickness,
+              };
+              wasmEngine.addStroke(wasmStroke);
+            });
+            
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            break;
+          }
+
+          default: {
+            // TypeScript will ensure we handle all cases
+            const exhaustiveCheck: never = message;
+            console.warn("Unhandled message type:", exhaustiveCheck);
+          }
         }
       } catch (error) {
         console.error("Failed to handle WebSocket message:", error);
       }
     },
-    [wasmEngine],
+    [isLoaded, wasmEngine],
   );
 
-  // Set WebSocket message handler when WASM is loaded
+  // Set WebSocket message handler when WebSocket is connected
   React.useEffect(() => {
-    if (state.websocket && state.isConnected && isLoaded) {
+    if (state.websocket && state.isConnected) {
       state.websocket.onmessage = handleWebSocketMessage;
       console.log("WebSocket message handler set");
     }
-  }, [state.websocket, state.isConnected, isLoaded, handleWebSocketMessage]);
+  }, [state.websocket, state.isConnected, handleWebSocketMessage]);
 
   // Tool management
   const setActiveTool = useCallback(
@@ -785,6 +943,73 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     dispatch({ type: "TRIGGER_STROKE_UPDATE" });
   }, []);
 
+  // Chat operations
+  const sendWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      if (!state.websocket || !state.isConnected) {
+        console.warn("WebSocket not connected, cannot send message");
+        return;
+      }
+      
+      try {
+        const messageString = JSON.stringify(message);
+        console.log("Sending WebSocket message:", messageString);
+        state.websocket.send(messageString);
+        console.log("WebSocket message sent successfully");
+      } catch (error) {
+        console.error("Failed to send WebSocket message:", error);
+      }
+    },
+    [state.websocket, state.isConnected]
+  );
+
+  const sendChatMessage = useCallback(
+    (content: string) => {
+      if (!content.trim()) return;
+      
+      const message: WebSocketMessage = {
+        type: "chat:message",
+        userId: state.userId,
+        timestamp: Date.now(),
+        payload: {
+          userId: state.userId,
+          username: `User ${state.userId.slice(0, 8)}`,
+          content: content.trim(),
+          timestamp: Date.now()
+        }
+      };
+      
+      console.log("Sending chat message:", JSON.stringify(message, null, 2));
+      sendWebSocketMessage(message);
+    },
+    [state.userId, sendWebSocketMessage]
+  );
+
+  const sendTypingStatus = useCallback(
+    (isTyping: boolean) => {
+      const message: WebSocketMessage = {
+        type: "chat:typing",
+        userId: state.userId,
+        timestamp: Date.now(),
+        payload: {
+          userId: state.userId,
+          isTyping
+        }
+      };
+      
+      sendWebSocketMessage(message);
+    },
+    [state.userId, sendWebSocketMessage]
+  );
+
+  const clearChat = useCallback(() => {
+    dispatch({ type: "CLEAR_CHAT" });
+  }, []);
+
+  const markChatAsRead = useCallback(() => {
+    dispatch({ type: "MARK_CHAT_AS_READ" });
+  }, []);
+
   // Sync strokes when WASM updates
   React.useEffect(() => {
     console.log("Stroke update trigger changed:", state.strokeUpdateTrigger);
@@ -816,6 +1041,11 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     sendStrokeStart,
     sendStrokePoint,
     sendStrokeFinish,
+    sendChatMessage,
+    sendTypingStatus,
+    clearChat,
+    markChatAsRead,
+    sendWebSocketMessage,
   };
 
   return (
