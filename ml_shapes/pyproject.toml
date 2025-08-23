@@ -8,14 +8,13 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "torch (>=2.8.0,<3.0.0)",
-    "torchvision (>=0.23.0,<0.24.0)",
-    "torchaudio (>=2.8.0,<3.0.0)",
     "matplotlib (>=3.10.5,<4.0.0)",
     "pillow (>=11.3.0,<12.0.0)",
     "numpy (>=2,<2.3.0)",
     "opencv-python-headless (>=4.12.0.88,<5.0.0.0)",
     "ndjson (>=0.3.1,<0.4.0)",
+    "torch (>=2.8.0,<3.0.0)",
+    "torchvision (>=0.23.0,<0.24.0)",
 ]
 
 
@@ -29,7 +28,11 @@ url = "https://download.pytorch.org/whl/cu118"
 priority = "explicit"
 
 
+[[tool.poetry.source]]
+name = "torch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+priority = "explicit"
 [tool.poetry.dependencies]
-torch = {source = "pytorch_cuda_118"}
-torchvision = {source = "pytorch_cuda_118"}
-torchaudio = {source = "pytorch_cuda_118"}
+torch = {source = "torch-cu129"}
+torchvision = {source = "torch-cu129"}
+
