@@ -1,11 +1,12 @@
 import { Canvas } from "./components/Canvas";
+import { ChatPanel } from "./components/Chat";
 import { Toolbar } from "./components/Toolbar";
 import { WebSocketStatus } from "./components/WebSocketStatus";
 import { WhiteboardProvider } from "./contexts/WhiteboardContext";
 
-import type { ToolType } from "./types/tool";
 import "./App.css";
 import { useWhiteboard } from "./contexts/ctx";
+import type { ToolType } from "./types/tool";
 
 // Inner App component that uses the context
 const AppContent: React.FC = () => {
@@ -60,6 +61,7 @@ const AppContent: React.FC = () => {
         onSettingsChange={handleSettingsChange}
       />
       <Canvas />
+      <ChatPanel />
     </div>
   );
 };

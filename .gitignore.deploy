@@ -1,5 +1,7 @@
+# Deployment-specific .gitignore
+# This file is used during deployment to allow WASM files
 
-# Build directories
+# Build directories (but allow WASM)
 build/
 out/
 cmake-build-*/
@@ -100,8 +102,6 @@ run_backend_tests.sh
 *.backup
 *~ 
 
-
-
 .cursor/rules
 .obsidianC++_SERVER_BUILD_GUIDE.md
 backend/cpp_server/build.sh
@@ -110,15 +110,9 @@ backend/cpp_server/test_server.sh
 # Protocol Buffers implementation tasks and design documents
 tasks_todo_and_design/
 
-
 .obsidian
 
 TODO
 
-# WASM build artifacts (excluded from git but included in deployment)
-frontend/public/drawing_engine.js
-frontend/public/drawing_engine.wasm
-frontend/public/drawing_engine.wasm.map
-backend/build/
-*.wasm
-*.wasm.map
+# Note: WASM files are NOT ignored in deployment
+# This allows them to be included in deployment packages
