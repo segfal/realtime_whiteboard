@@ -6,12 +6,22 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     zlib1g-dev \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy source code
 COPY . .
+
+# Clone dependencies directly (since .git is excluded)
+RUN rm -rf vendor && mkdir -p vendor \
+    && cd vendor \
+    && git clone https://github.com/uNetworking/uWebSockets.git \
+    && cd uWebSockets \
+    && git submodule update --init --recursive \
+    && cd .. \
+    && git clone https://github.com/nlohmann/json.git
 
 # Build the application
 RUN mkdir -p build && cd build \

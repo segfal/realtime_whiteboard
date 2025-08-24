@@ -1,8 +1,11 @@
 {
-  "os_type": "macos",
-  "architecture": "arm64",
-  "gpu_type": "apple_silicon",
+  "os_type": "linux",
+  "architecture": "x86_64",
+  "gpu_type": "nvidia",
   "pytorch_version": "cpu",
   "pytorch_source": "default",
-  "detected_at": "2025-08-24T21:59:14Z"
+  "docker_installed": true,
+  "railway_ready": true,
+  "detected_at": "2025-08-24T21:59:14Z",
+  "environment": "wsl2"
 }
