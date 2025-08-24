@@ -12,7 +12,10 @@ import type { WhiteboardContextType, WhiteboardState } from "./types";
 type WhiteboardAction =
   | { type: "ADD_CHAT_MESSAGE"; payload: ChatMessage }
   | { type: "SET_CHAT_MESSAGES"; payload: ChatMessage[] }
-  | { type: "SET_TYPING_STATUS"; payload: { userId: string; isTyping: boolean } }
+  | {
+      type: "SET_TYPING_STATUS";
+      payload: { userId: string; isTyping: boolean };
+    }
   | { type: "CLEAR_CHAT" }
   | { type: "SET_UNREAD_COUNT"; payload: number }
   | { type: "SET_ACTIVE_TOOL"; payload: ToolType }
@@ -74,17 +77,17 @@ localStorage.setItem("userId", initialState.userId);
 // Reducer function for state management
 function whiteboardReducer(
   state: WhiteboardState,
-  action: WhiteboardAction,
+  action: WhiteboardAction
 ): WhiteboardState {
   switch (action.type) {
     case "SET_ACTIVE_TOOL": {
       console.log("SET_ACTIVE_TOOL reducer called with:", action.payload);
       console.log(
         "Current allTools:",
-        state.allTools.map((t) => t.id),
+        state.allTools.map((t) => t.id)
       );
       const foundTool = state.allTools.find(
-        (tool) => tool.id === action.payload,
+        (tool) => tool.id === action.payload
       );
       console.log("Found tool:", foundTool?.id || "NOT FOUND");
 
@@ -219,8 +222,8 @@ function whiteboardReducer(
             ? new Set([...state.chat.typingUsers, action.payload.userId])
             : new Set(
                 Array.from(state.chat.typingUsers).filter(
-                  (userId: string) => userId !== action.payload.userId,
-                ),
+                  (userId: string) => userId !== action.payload.userId
+                )
               ),
         },
       };
@@ -276,7 +279,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     const allTools = toolManager.getAllTools();
     console.log(
       "Available tools:",
-      allTools.map((t) => t.id),
+      allTools.map((t) => t.id)
     );
 
     // Set allTools first
@@ -292,7 +295,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       const activeTool = toolManager.getActiveTool();
       console.log(
         "Setting initial active tool after allTools loaded:",
-        activeTool.id,
+        activeTool.id
       );
       dispatch({ type: "SET_ACTIVE_TOOL", payload: activeTool.id as ToolType });
     }
@@ -330,7 +333,8 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
   // WebSocket connection function
   const connectWebSocket = useCallback(() => {
     try {
-      const ws = new WebSocket("ws://localhost:9000");
+      const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:9000";
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log("WebSocket connected");
@@ -402,7 +406,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         },
       };
     },
-    [state.userId],
+    [state.userId]
   );
 
   const sendStrokeViaWebSocket = useCallback(
@@ -419,7 +423,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         console.log("WebSocket not connected, cannot send stroke");
       }
     },
-    [state.websocket, state.isConnected],
+    [state.websocket, state.isConnected]
   );
 
   // New message types for real-time drawing
@@ -441,7 +445,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         console.log("Sent stroke start:", message);
       }
     },
-    [state.websocket, state.isConnected, state.settings, state.userId],
+    [state.websocket, state.isConnected, state.settings, state.userId]
   );
 
   const sendStrokePoint = useCallback(
@@ -461,7 +465,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         console.log("Sent stroke point:", message);
       }
     },
-    [state.websocket, state.isConnected, state.userId],
+    [state.websocket, state.isConnected, state.userId]
   );
 
   const sendStrokeFinish = useCallback(
@@ -480,7 +484,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         console.log("Sent stroke finish:", message);
       }
     },
-    [state.websocket, state.isConnected, state.userId],
+    [state.websocket, state.isConnected, state.userId]
   );
 
   const handleWebSocketMessage = useCallback(
@@ -541,6 +545,18 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
             break;
           }
 
+          case "stroke:erase": {
+            if (!isLoaded || !wasmEngine) break;
+            const { strokeIndex } = message.payload;
+            console.log("Received stroke erase:", strokeIndex);
+            
+            if (strokeIndex >= 0 && strokeIndex < wasmEngine.getStrokes().length) {
+              wasmEngine.removeStroke(strokeIndex);
+              dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            }
+            break;
+          }
+
           case "chat:sync": {
             const { chatHistory } = message.payload;
             console.log("Received chat sync:", chatHistory);
@@ -556,7 +572,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
               username: message.payload.username,
               content: message.payload.content,
               timestamp: message.payload.timestamp,
-              type: 'text'
+              type: "text",
             };
             console.log("Dispatching chat message:", chatMessage);
             dispatch({ type: "ADD_CHAT_MESSAGE", payload: chatMessage });
@@ -564,12 +580,12 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           }
 
           case "chat:typing": {
-            dispatch({ 
-              type: "SET_TYPING_STATUS", 
-              payload: { 
-                userId: message.payload.userId, 
-                isTyping: message.payload.isTyping 
-              } 
+            dispatch({
+              type: "SET_TYPING_STATUS",
+              payload: {
+                userId: message.payload.userId,
+                isTyping: message.payload.isTyping,
+              },
             });
             break;
           }
@@ -577,11 +593,11 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           case "user:join": {
             const systemMessage: ChatMessage = {
               id: crypto.randomUUID(),
-              userId: 'system',
-              username: 'System',
+              userId: "system",
+              username: "System",
               content: `${message.payload.username} joined the session`,
               timestamp: message.payload.timestamp,
-              type: 'system'
+              type: "system",
             };
             dispatch({ type: "ADD_CHAT_MESSAGE", payload: systemMessage });
             break;
@@ -590,11 +606,11 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           case "user:leave": {
             const systemMessage: ChatMessage = {
               id: crypto.randomUUID(),
-              userId: 'system',
-              username: 'System',
+              userId: "system",
+              username: "System",
               content: `A user left the session`,
               timestamp: message.payload.timestamp,
-              type: 'system'
+              type: "system",
             };
             dispatch({ type: "ADD_CHAT_MESSAGE", payload: systemMessage });
             break;
@@ -604,7 +620,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
             if (!isLoaded || !wasmEngine) break;
             const { strokes } = message.payload;
             console.log("Received board sync:", strokes.length, "strokes");
-            
+
             // Clear existing strokes and add synced strokes
             wasmEngine.clear();
             strokes.forEach((strokeData) => {
@@ -615,7 +631,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
               };
               wasmEngine.addStroke(wasmStroke);
             });
-            
+
             dispatch({ type: "TRIGGER_STROKE_UPDATE" });
             break;
           }
@@ -630,7 +646,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         console.error("Failed to handle WebSocket message:", error);
       }
     },
-    [isLoaded, wasmEngine],
+    [isLoaded, wasmEngine]
   );
 
   // Set WebSocket message handler when WebSocket is connected
@@ -647,7 +663,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       console.log("setActiveTool called with:", toolType);
       console.log(
         "Current allTools:",
-        state.allTools.map((t) => t.id),
+        state.allTools.map((t) => t.id)
       );
 
       // Safety check: ensure allTools is available
@@ -664,7 +680,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       dispatch({ type: "SET_ACTIVE_TOOL", payload: toolType });
       ToolDebugger.logToolChange(state.activeTool.id, toolType);
     },
-    [toolManager, state.activeTool.id, state.allTools],
+    [toolManager, state.activeTool.id, state.allTools]
   );
 
   const updateSettings = useCallback(
@@ -672,7 +688,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       toolManager.updateSettings(settings);
       dispatch({ type: "UPDATE_SETTINGS", payload: settings });
     },
-    [toolManager],
+    [toolManager]
   );
 
   // Drawing operations
@@ -682,7 +698,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         "startDrawing called with point:",
         point,
         "WASM loaded:",
-        isLoaded,
+        isLoaded
       );
       if (!isLoaded) {
         console.log("WASM not loaded, cannot start drawing");
@@ -735,7 +751,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       dispatch({ type: "SET_CURRENT_STROKE_ID", payload: strokeId });
       sendStrokeStart(point);
     },
-    [isLoaded, wasmEngine, state.settings, sendStrokeStart],
+    [isLoaded, wasmEngine, state.settings, sendStrokeStart]
   );
 
   const continueDrawing = useCallback(
@@ -744,7 +760,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         "continueDrawing called with point:",
         point,
         "current stroke points:",
-        state.currentStroke?.points.length || 0,
+        state.currentStroke?.points.length || 0
       );
       if (!isLoaded || !state.currentStroke) {
         console.log("Cannot continue drawing:", {
@@ -801,13 +817,13 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       state.currentStroke,
       state.currentStrokeId,
       sendStrokePoint,
-    ],
+    ]
   );
 
   const finishDrawing = useCallback(() => {
     console.log(
       "finishDrawing called, current stroke points:",
-      state.currentStroke?.points.length || 0,
+      state.currentStroke?.points.length || 0
     );
     if (state.currentStroke && state.currentStroke.points.length > 0) {
       try {
@@ -820,7 +836,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           "Finishing stroke, adding last point to WASM stroke index:",
           strokeIndex,
           "point:",
-          lastPoint,
+          lastPoint
         );
         wasmEngine.addPointToStroke(strokeIndex, lastPoint);
         dispatch({ type: "TRIGGER_STROKE_UPDATE" });
@@ -846,6 +862,26 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     sendStrokeFinish,
   ]);
 
+  // Chat operations
+  const sendWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      if (!state.websocket || !state.isConnected) {
+        console.warn("WebSocket not connected, cannot send message");
+        return;
+      }
+
+      try {
+        const messageString = JSON.stringify(message);
+        console.log("Sending WebSocket message:", messageString);
+        state.websocket.send(messageString);
+        console.log("WebSocket message sent successfully");
+      } catch (error) {
+        console.error("Failed to send WebSocket message:", error);
+      }
+    },
+    [state.websocket, state.isConnected]
+  );
+
   // Eraser operations
   const eraseAtPoint = useCallback(
     async (point: Point) => {
@@ -864,7 +900,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           const isNear = reactStroke.points.some((strokePoint) => {
             const distance = Math.hypot(
               point.x - strokePoint.x,
-              point.y - strokePoint.y,
+              point.y - strokePoint.y
             );
             return distance <= eraserSize;
           });
@@ -880,6 +916,20 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
             console.log("Removing stroke:", i);
             wasmEngine.removeStroke(i);
             dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            
+            // Send erase message via WebSocket
+            const eraseMessage: WebSocketMessage = {
+              type: "stroke:erase",
+              userId: state.userId,
+              timestamp: Date.now(),
+              payload: {
+                userId: state.userId,
+                strokeIndex: i,
+                point: point,
+              },
+            };
+            console.log("Sending erase message:", eraseMessage);
+            sendWebSocketMessage(eraseMessage);
             break;
           }
         }
@@ -889,7 +939,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         logger.error("WASM not ready yet:", err);
       }
     },
-    [isLoaded, wasmEngine, state.settings.eraserSize, wasmStrokeToReact],
+    [isLoaded, wasmEngine, state.settings.eraserSize, wasmStrokeToReact, state.userId, sendWebSocketMessage]
   );
 
   // Selection operations
@@ -910,14 +960,14 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         logger.error("WASM not ready yet:", err);
       }
     },
-    [isLoaded, wasmEngine, state.selectedStrokes],
+    [isLoaded, wasmEngine, state.selectedStrokes]
   );
 
   const deleteSelectedStrokes = useCallback(() => {
     if (!isLoaded) return;
 
     const indicesToRemove = Array.from(state.selectedStrokes).sort(
-      (a, b) => b - a,
+      (a, b) => b - a
     );
     indicesToRemove.forEach((index) => {
       wasmEngine.removeStroke(index);
@@ -943,30 +993,10 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     dispatch({ type: "TRIGGER_STROKE_UPDATE" });
   }, []);
 
-  // Chat operations
-  const sendWebSocketMessage = useCallback(
-    (message: WebSocketMessage) => {
-      if (!state.websocket || !state.isConnected) {
-        console.warn("WebSocket not connected, cannot send message");
-        return;
-      }
-      
-      try {
-        const messageString = JSON.stringify(message);
-        console.log("Sending WebSocket message:", messageString);
-        state.websocket.send(messageString);
-        console.log("WebSocket message sent successfully");
-      } catch (error) {
-        console.error("Failed to send WebSocket message:", error);
-      }
-    },
-    [state.websocket, state.isConnected]
-  );
-
   const sendChatMessage = useCallback(
     (content: string) => {
       if (!content.trim()) return;
-      
+
       const message: WebSocketMessage = {
         type: "chat:message",
         userId: state.userId,
@@ -975,10 +1005,10 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           userId: state.userId,
           username: `User ${state.userId.slice(0, 8)}`,
           content: content.trim(),
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       };
-      
+
       console.log("Sending chat message:", JSON.stringify(message, null, 2));
       sendWebSocketMessage(message);
     },
@@ -993,10 +1023,10 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         timestamp: Date.now(),
         payload: {
           userId: state.userId,
-          isTyping
-        }
+          isTyping,
+        },
       };
-      
+
       sendWebSocketMessage(message);
     },
     [state.userId, sendWebSocketMessage]

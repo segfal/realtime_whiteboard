@@ -39,6 +39,7 @@ export const ChatPanel: React.FC = () => {
     };
     // Dispatch directly to test UI
     // This bypasses WebSocket to test if the UI works
+    console.log("Adding test message:", testMessage);
   };
 
   return (
@@ -56,6 +57,21 @@ export const ChatPanel: React.FC = () => {
             {state.chat.messages.length === 0 && (
               <div style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
                 No messages yet. Start chatting!
+                <br />
+                <button 
+                  onClick={addTestMessage}
+                  style={{ 
+                    marginTop: '10px', 
+                    padding: '5px 10px', 
+                    background: '#007bff', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Add Test Message
+                </button>
               </div>
             )}
             {state.chat.messages.map((message) => (

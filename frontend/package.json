@@ -3,10 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "dev": "npm run build:wasm && vite",
     "dev:fast": "vite",
-    "build": "npm run build:wasm && tsc && vite build",
+    "build": "tsc && vite build",
     "build:wasm": "cd ../backend && ./scripts/build_wasm.sh",
     "build:wasm:watch": "cd ../backend && ./scripts/build_wasm.sh && fswatch -o src/ | xargs -n1 -I{} ./scripts/build_wasm.sh",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -26,6 +29,9 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:all": "npm run lint && npm run type-check && npm run test",
+    "pre-deploy": "./scripts/validate.sh",
+    "predeploy": "npm run pre-deploy",
+    "deploy": "vercel --prod",
     "test:windows": "vitest run --reporter=verbose",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

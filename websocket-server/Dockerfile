@@ -1,62 +1,39 @@
-# Multi-stage build for C++ WebSocket server
-FROM gcc:latest AS builder
+FROM gcc:12
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
     cmake \
+    libssl-dev \
+    zlib1g-dev \
+    curl \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
 # Copy source code
 COPY . .
 
-# Clone dependencies if not present
-RUN if [ ! -d "vendor/uWebSockets" ]; then \
-        mkdir -p vendor && \
-        git clone --recursive https://github.com/uNetworking/uWebSockets.git vendor/uWebSockets; \
-    fi
+# Clone dependencies directly (since .git is excluded)
+RUN rm -rf vendor && mkdir -p vendor \
+    && cd vendor \
+    && git clone https://github.com/uNetworking/uWebSockets.git \
+    && cd uWebSockets \
+    && git submodule update --init --recursive \
+    && cd .. \
+    && git clone https://github.com/nlohmann/json.git
 
-RUN if [ ! -d "vendor/json" ]; then \
-        git clone https://github.com/nlohmann/json.git vendor/json; \
-    fi
+# Build the application
+RUN mkdir -p build && cd build \
+    && cmake .. \
+    && make -j$(nproc)
 
-# Build the server
-RUN mkdir -p build && cd build && \
-    cmake .. && \
-    make -j$(nproc)
-
-# Runtime stage
-FROM ubuntu:22.04 AS runtime
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser
-
-# Set working directory
-WORKDIR /app
-
-# Copy binary from builder stage
-COPY --from=builder /app/build/server .
-
-# Change ownership
-RUN chown appuser:appuser /app/server
-
-# Switch to non-root user
-USER appuser
-
-# Expose WebSocket port
+# Expose port
 EXPOSE 9000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD echo "Health check not implemented yet" || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:9000/health || exit 1
 
 # Run the server
-CMD ["./server"]
+CMD ["./build/server"]

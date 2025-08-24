@@ -17,22 +17,10 @@ dependencies = [
     "torchvision (>=0.23.0,<0.24.0)",
 ]
 
-
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[[tool.poetry.source]]
-name = "pytorch_cuda_118"
-url = "https://download.pytorch.org/whl/cu118"
-priority = "explicit"
-
-
-[[tool.poetry.source]]
-name = "torch-cu129"
-url = "https://download.pytorch.org/whl/cu129"
-priority = "explicit"
 [tool.poetry.dependencies]
-torch = {source = "torch-cu129"}
-torchvision = {source = "torch-cu129"}
-
+torch = "^2.8.0"
+torchvision = "^0.23.0"
