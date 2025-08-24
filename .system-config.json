@@ -1,0 +1,8 @@
+{
+  "os_type": "macos",
+  "architecture": "arm64",
+  "gpu_type": "apple_silicon",
+  "pytorch_version": "cpu",
+  "pytorch_source": "default",
+  "detected_at": "2025-08-24T21:59:14Z"
+}

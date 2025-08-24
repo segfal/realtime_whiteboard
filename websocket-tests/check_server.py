@@ -14,3 +14,4 @@ async def check_server():
 if __name__ == "__main__":
     result = asyncio.run(check_server())
     exit(0 if result else 1)
+

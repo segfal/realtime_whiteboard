@@ -42,3 +42,4 @@ public/drawing_engine.wasm.map
 build/
 *.wasm
 *.wasm.map
+.vercel

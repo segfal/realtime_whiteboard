@@ -8,6 +8,7 @@
 #include <mutex>
 #include <functional>
 #include <shared_mutex>
+#include <cstdlib>
 
 using json = nlohmann::json;
 
@@ -64,9 +65,6 @@ struct MessageDispatcher {
 	}
 };
 
-
-
-
 int main() {
     std::cout << "Starting Realtime Whiteboard Server..." << std::endl;
 
@@ -114,7 +112,12 @@ int main() {
         ws->publish("whiteboard", raw, op);
     });
 
-    uWS::App().ws<UserData>("/*", {
+    auto app = uWS::App()
+        .get("/health", [](auto *res, auto *req) {
+            res->writeHeader("Content-Type", "application/json");
+            res->end(R"({"status":"healthy","service":"websocket-server","timestamp":")" + std::to_string(std::time(nullptr)) + R"("})");
+        })
+        .ws<UserData>("/*", {
         .compression = uWS::CompressOptions(uWS::SHARED_COMPRESSOR),
         .maxPayloadLength = 16 * 1024 * 1024,
         .idleTimeout = 16,
@@ -173,13 +176,19 @@ int main() {
         .close = [](auto */*ws*/, int code, std::string_view message) {
             std::cout << "WebSocket connection closed with code: " << code << std::endl;
         }
-    }).listen(9000, [](auto *listen_socket) {
+    });
+    
+    // Get port from environment variable or default to 9000
+    const char* port_env = std::getenv("PORT");
+    int port = port_env ? std::atoi(port_env) : 9000;
+    
+    app.listen(port, [port](auto *listen_socket) {
         if (listen_socket) {
-            std::cout << "Realtime Whiteboard Server listening on ws://localhost:9000" << std::endl;
+            std::cout << "Realtime Whiteboard Server listening on port " << port << std::endl;
         } else {
-            std::cout << "Failed to listen on port 9000" << std::endl;
+            std::cout << "Failed to listen on port " << port << std::endl;
         }
     }).run();
 
     return 0;
-} 
+}
