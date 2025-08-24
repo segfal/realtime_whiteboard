@@ -1,26 +1,31 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { WhiteboardProvider } from '../../contexts/WhiteboardContext';
 import { ChatPanel } from './ChatPanel';
-
+import { vi } from 'vitest';
 // Mock the useWhiteboard hook
-jest.mock('../../contexts/ctx', () => ({
-  useWhiteboard: () => ({
-    state: {
-      userId: 'test-user-123',
-      isConnected: true,
-      chat: {
-        messages: [],
-        isTyping: false,
-        typingUsers: new Set(),
-        unreadCount: 0,
-      },
-    },
-    sendChatMessage: jest.fn(),
-    sendTypingStatus: jest.fn(),
-    markChatAsRead: jest.fn(),
-  }),
-}));
 
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+vi.mock('../../contexts/ctx', async (importOriginal) => {
+  const actual = await importOriginal(); // import real exports
+  return {
+    ...actual, // keep all original exports
+    useWhiteboard: () => ({
+      state: {
+        userId: 'test-user-123',
+        isConnected: true,
+        chat: {
+          messages: [],
+          isTyping: false,
+          typingUsers: new Set(),
+          unreadCount: 0,
+        },
+      },
+      sendChatMessage: vi.fn(),
+      sendTypingStatus: vi.fn(),
+      markChatAsRead: vi.fn(),
+    }),
+  };
+});
 describe('ChatPanel', () => {
   it('renders chat panel when closed', () => {
     render(
