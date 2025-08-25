@@ -44,7 +44,7 @@ export interface ToolSettings {
   pressure?: boolean;
 }
 
-export type ToolType = "stroke" | "rectangle" | "ellipse" | "eraser" | "select";
+export type ToolType = "stroke" | "rectangle" | "ellipse" | "eraser" | "select" | "spline";
 
 export interface ToolState {
   activeTool: ToolType;

@@ -20,6 +20,7 @@ export interface WhiteboardState {
   strokes: Stroke[];
   selectedStrokes: Set<number>;
   previewShape: Stroke | null;
+  splinePreview: { controlPoints: Point[]; splinePoints: Point[]; color: string; thickness: number } | null;
 
   // UI state
   isDragging: boolean;
@@ -62,6 +63,10 @@ export interface WhiteboardContextType {
   // Canvas operations
   clearCanvas: () => void;
   exportCanvas: (format: "png" | "svg") => void;
+
+  // Stroke simplification operations
+  simplifyStroke: (strokeIndex: number, epsilon?: number) => void;
+  simplifyAllStrokes: (epsilon?: number) => void;
 
   // Utility
   triggerStrokeUpdate: () => void;

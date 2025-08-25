@@ -27,6 +27,9 @@ export const Canvas: React.FC = () => {
     deleteSelectedStrokes,
     clearCanvas,
     triggerStrokeUpdate,
+    simplifyStroke,
+    simplifyAllStrokes,
+    setSplinePreview,
   } = useWhiteboard();
 
   // Get direct access to WASM engine for faster shape creation
@@ -123,6 +126,10 @@ export const Canvas: React.FC = () => {
       ToolDebugger.logToolAction("stroke", "start", mouse);
       console.log("Starting stroke drawing");
       startDrawing(mouse);
+    } else if (state.activeTool.id === "spline") {
+      ToolDebugger.logToolAction("spline", "start", mouse);
+      console.log("Starting spline drawing");
+      startDrawing(mouse);
     } else if (
       state.activeTool.id === "rectangle" ||
       state.activeTool.id === "ellipse"
@@ -160,6 +167,9 @@ export const Canvas: React.FC = () => {
     } else if (state.activeTool.id === "stroke") {
       console.log("Continuing stroke drawing");
       continueDrawing(mouse);
+    } else if (state.activeTool.id === "spline") {
+      console.log("Continuing spline drawing");
+      continueDrawing(mouse);
     } else if (
       state.activeTool.id === "rectangle" ||
       state.activeTool.id === "ellipse"
@@ -183,6 +193,9 @@ export const Canvas: React.FC = () => {
       handleSelectUp();
     } else if (state.activeTool.id === "stroke") {
       console.log("Finishing stroke drawing");
+      finishDrawing();
+    } else if (state.activeTool.id === "spline") {
+      console.log("Finishing spline drawing");
       finishDrawing();
     } else if (
       state.activeTool.id === "rectangle" ||
@@ -478,6 +491,29 @@ export const Canvas: React.FC = () => {
       ctx.restore();
     }
 
+    // Draw spline preview (for real-time spline preview during drawing)
+    if (state.splinePreview && state.splinePreview.splinePoints.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = state.splinePreview.color;
+      ctx.lineWidth = state.splinePreview.thickness;
+      ctx.setLineDash([3, 3]); // Dotted line for spline preview
+      ctx.beginPath();
+      ctx.moveTo(state.splinePreview.splinePoints[0].x, state.splinePreview.splinePoints[0].y);
+      state.splinePreview.splinePoints.forEach((pt) => ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+      
+      // Draw control points for debugging
+      if (state.splinePreview.controlPoints.length > 0) {
+        ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+        state.splinePreview.controlPoints.forEach((pt) => {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 3, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      }
+      ctx.restore();
+    }
+
     // Draw context preview shape (for other previews)
     if (state.previewShape && state.previewShape.points.length > 1) {
       ctx.save();
@@ -500,6 +536,7 @@ export const Canvas: React.FC = () => {
     state.selectedStrokes,
     state.previewShape,
     previewShape,
+    state.splinePreview,
   ]);
 
   if (state.wasmError) {
@@ -536,6 +573,23 @@ export const Canvas: React.FC = () => {
           disabled={state.selectedStrokes.size === 0}
         >
           Delete Selected
+        </button>
+        <button
+          onClick={() => {
+            // Simplify selected strokes
+            state.selectedStrokes.forEach(index => {
+              simplifyStroke(index, 1.0);
+            });
+          }}
+          disabled={state.selectedStrokes.size === 0}
+        >
+          Simplify Selected
+        </button>
+        <button
+          onClick={() => simplifyAllStrokes(1.0)}
+          disabled={state.strokes.length === 0}
+        >
+          Simplify All
         </button>
         <button
           onClick={() => {

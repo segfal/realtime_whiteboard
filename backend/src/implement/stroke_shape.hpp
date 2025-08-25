@@ -17,6 +17,9 @@ struct StrokeShape : public Shape {
     // Getter methods for Emscripten binding
     const Color& getColor() const { return color; }
     float getThickness() const { return thickness; }
+    void simplify(float epsilon = 1.0f) {
+        points = RDP::simplify(points,epsilon);
+    }
 };
 
 #endif

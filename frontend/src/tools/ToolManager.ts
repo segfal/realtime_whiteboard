@@ -9,6 +9,7 @@ import { RectangleTool } from "./RectangleTool";
 import { EllipseTool } from "./EllipseTool";
 import { EraserTool } from "./EraserTool";
 import { SelectTool } from "./SelectTool";
+import { SplineTool } from "./SplineTool";
 import type { WASMShape } from "../types/wasm";
 
 export class ToolManager {
@@ -32,6 +33,7 @@ export class ToolManager {
     this.tools.set("ellipse", new EllipseTool(this.settings));
     this.tools.set("eraser", new EraserTool(this.settings));
     this.tools.set("select", new SelectTool(this.settings));
+    this.tools.set("spline", new SplineTool(this.settings));
 
     console.log(
       "ToolManager: Initialized tools:",
