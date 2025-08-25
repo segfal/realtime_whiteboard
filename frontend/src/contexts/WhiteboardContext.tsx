@@ -7,6 +7,7 @@ import type { DrawingTool, ToolSettings, ToolType } from "../types/tool";
 import { logger, PerformanceTracker, ToolDebugger } from "../utils/debug";
 import { WhiteboardContext } from "./ctx";
 import type { WhiteboardContextType, WhiteboardState } from "./types";
+import { GoWebSocketService, type GoWebSocketMessage, type GoStroke } from "../services/goWebSocketService";
 
 // Action types for the reducer
 type WhiteboardAction =
@@ -39,6 +40,7 @@ type WhiteboardAction =
       type: "SET_WEBSOCKET_CONNECTED";
       payload: { websocket: WebSocket | null; isConnected: boolean };
     }
+  | { type: "SET_GO_WEBSOCKET_SERVICE"; payload: GoWebSocketService | null }
   | { type: "SET_CURRENT_STROKE_ID"; payload: string | null }
   | { type: "MARK_CHAT_AS_READ" };
 
@@ -64,6 +66,7 @@ const initialState: WhiteboardState = {
   strokeUpdateTrigger: 0,
   websocket: null,
   isConnected: false,
+  goWebSocketService: null as GoWebSocketService | null,
   userId: localStorage.getItem("userId") || crypto.randomUUID(), //TODO:
   currentStrokeId: null,
   chat: {
@@ -194,6 +197,12 @@ function whiteboardReducer(
         ...state,
         websocket: action.payload.websocket,
         isConnected: action.payload.isConnected,
+      };
+
+    case "SET_GO_WEBSOCKET_SERVICE":
+      return {
+        ...state,
+        goWebSocketService: action.payload,
       };
 
     case "SET_CURRENT_STROKE_ID":
@@ -339,34 +348,93 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
   }, []);
 
   // WebSocket connection function
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(async () => {
     try {
-      const wsUrl = import.meta.env.VITE_WEBSOCKET_URL || "ws://localhost:9000";
-      const ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        console.log("WebSocket connected");
+      const goWebSocketService = new GoWebSocketService();
+      
+      goWebSocketService.setConnectHandler(() => {
+        console.log("Connected to Go WebSocket server");
         dispatch({
           type: "SET_WEBSOCKET_CONNECTED",
-          payload: { websocket: ws, isConnected: true },
+          payload: { websocket: null, isConnected: true },
         });
-      };
+        dispatch({
+          type: "SET_GO_WEBSOCKET_SERVICE",
+          payload: goWebSocketService,
+        });
+        
+        // Auto-join the hackathon room
+        goWebSocketService.joinRoom('hackathon-room');
+      });
 
-      ws.onclose = () => {
-        console.log("WebSocket disconnected");
+      goWebSocketService.setDisconnectHandler(() => {
+        console.log("Disconnected from Go WebSocket server");
         dispatch({
           type: "SET_WEBSOCKET_CONNECTED",
           payload: { websocket: null, isConnected: false },
         });
-      };
+        dispatch({
+          type: "SET_GO_WEBSOCKET_SERVICE",
+          payload: null,
+        });
+      });
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-      };
+      goWebSocketService.setMessageHandler((message: GoWebSocketMessage) => {
+        handleGoWebSocketMessage(message);
+      });
+
+      await goWebSocketService.connect();
     } catch (error) {
-      console.error("Failed to connect WebSocket:", error);
+      console.error("Failed to connect to Go WebSocket server:", error);
     }
   }, []);
+
+  const handleGoWebSocketMessage = useCallback((message: GoWebSocketMessage) => {
+    console.log("Handling Go WebSocket message:", message);
+    
+    switch (message.type) {
+      case 'joined': {
+        console.log(`Joined room as ${message.username}`);
+        if (message.data && Array.isArray(message.data)) {
+          // Load existing strokes from the server
+          message.data.forEach((strokeData: GoStroke) => {
+            if (isLoaded && wasmEngine) {
+              const wasmStroke: WASMStroke = {
+                points: strokeData.points,
+                color: strokeData.color,
+                thickness: strokeData.thickness,
+              };
+              wasmEngine.addStroke(wasmStroke);
+            }
+          });
+          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+        }
+        break;
+      }
+      
+      case 'stroke': {
+        if (message.data && isLoaded && wasmEngine) {
+          const strokeData: GoStroke = message.data;
+          const wasmStroke: WASMStroke = {
+            points: strokeData.points,
+            color: strokeData.color,
+            thickness: strokeData.thickness,
+          };
+          wasmEngine.addStroke(wasmStroke);
+          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+        }
+        break;
+      }
+      
+      case 'clear': {
+        if (isLoaded && wasmEngine) {
+          wasmEngine.clear();
+          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+        }
+        break;
+      }
+    }
+  }, [isLoaded, wasmEngine]);
 
   // Connect WebSocket on mount
   React.useEffect(() => {
@@ -419,19 +487,27 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
 
   const sendStrokeViaWebSocket = useCallback(
     (strokeData: unknown) => {
-      if (state.websocket && state.isConnected) {
+      if (state.goWebSocketService && state.isConnected) {
         try {
-          const message = JSON.stringify(strokeData);
-          state.websocket.send(message);
-          console.log("Sent stroke via WebSocket:", strokeData);
+          // Convert stroke data to Go format
+          const stroke = strokeData as Stroke;
+          const goStroke: GoStroke = {
+            points: stroke.points.map(p => [p.x, p.y]),
+            color: `rgb(${stroke.color.r}, ${stroke.color.g}, ${stroke.color.b})`,
+            thickness: stroke.thickness,
+            isEraser: stroke.isEraser || false,
+          };
+          
+          state.goWebSocketService.sendStroke(goStroke);
+          console.log("Sent stroke via Go WebSocket:", goStroke);
         } catch (error) {
-          console.error("Failed to send stroke via WebSocket:", error);
+          console.error("Failed to send stroke via Go WebSocket:", error);
         }
       } else {
-        console.log("WebSocket not connected, cannot send stroke");
+        console.log("Go WebSocket not connected, cannot send stroke");
       }
     },
-    [state.websocket, state.isConnected]
+    [state.goWebSocketService, state.isConnected]
   );
 
   // New message types for real-time drawing
@@ -950,8 +1026,13 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     if (wasmEngine) {
       wasmEngine.clear();
       dispatch({ type: "CLEAR_CANVAS" });
+      
+      // Send clear message via Go WebSocket
+      if (state.goWebSocketService && state.isConnected) {
+        state.goWebSocketService.clearCanvas();
+      }
     }
-  }, [wasmEngine]);
+  }, [wasmEngine, state.goWebSocketService, state.isConnected]);
 
   const exportCanvas = useCallback((format: "png" | "svg") => {
     dispatch({ type: "SET_EXPORT_FORMAT", payload: format });

@@ -122,3 +122,6 @@ frontend/public/drawing_engine.wasm.map
 backend/build/
 *.wasm
 *.wasm.map
+
+# Notes and diagrams (personal development notes)
+notes/

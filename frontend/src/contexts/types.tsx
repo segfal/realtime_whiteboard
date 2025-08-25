@@ -1,4 +1,5 @@
 import type { Point, Stroke } from "../interfaces/canvas";
+import type { GoWebSocketService } from "../services/goWebSocketService";
 import type { ChatState, WASMStroke, WebSocketMessage } from "../types";
 import type { DrawingTool, ToolSettings, ToolType } from "../types/tool";
 
@@ -7,6 +8,7 @@ export interface WhiteboardState {
   // WebSocket State
   websocket: WebSocket | null;
   isConnected: boolean;
+  goWebSocketService: GoWebSocketService | null;
   userId: string;
   currentStrokeId: string | null;
 
@@ -20,7 +22,12 @@ export interface WhiteboardState {
   strokes: Stroke[];
   selectedStrokes: Set<number>;
   previewShape: Stroke | null;
-  splinePreview: { controlPoints: Point[]; splinePoints: Point[]; color: string; thickness: number } | null;
+  splinePreview: {
+    controlPoints: Point[];
+    splinePoints: Point[];
+    color: string;
+    thickness: number;
+  } | null;
 
   // UI state
   isDragging: boolean;
@@ -84,7 +91,17 @@ export interface WhiteboardContextType {
   sendTypingStatus: (isTyping: boolean) => void;
   clearChat: () => void;
   markChatAsRead: () => void;
-  
+
   // Enhanced WebSocket operations with proper typing
   sendWebSocketMessage: (message: WebSocketMessage) => void;
+
+  // Spline operations
+  setSplinePreview: (
+    preview: {
+      controlPoints: Point[];
+      splinePoints: Point[];
+      color: string;
+      thickness: number;
+    } | null
+  ) => void;
 }

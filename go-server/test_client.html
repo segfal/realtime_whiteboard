@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Whiteboard Test Client</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      #canvas {
+        border: 1px solid #ccc;
+        cursor: crosshair;
+      }
+      #log {
+        height: 200px;
+        overflow-y: scroll;
+        border: 1px solid #ccc;
+        padding: 10px;
+        background: #f5f5f5;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      button {
+        margin: 5px;
+        padding: 8px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Whiteboard WebSocket Test Client</h1>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div>
+      <button onclick="connect()">Connect</button>
+      <button onclick="joinRoom()">Join Room</button>
+      <button onclick="sendTestStroke()">Send Test Stroke</button>
+      <button onclick="clearCanvas()">Clear Canvas</button>
+      <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <h3>WebSocket Log:</h3>
+    <div id="log"></div>
+
+    <script>
+      let ws = null;
+      let username = null;
+      let isDrawing = false;
+      let lastPoint = null;
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const status = document.getElementById("status");
+      const log = document.getElementById("log");
+
+      function logMessage(message) {
+        const time = new Date().toLocaleTimeString();
+        log.innerHTML += `[${time}] ${message}<br>`;
+        log.scrollTop = log.scrollHeight;
+      }
+
+      function updateStatus(connected) {
+        status.textContent = connected ? "Connected" : "Disconnected";
+        status.className = `status ${connected ? "connected" : "disconnected"}`;
+      }
+
+      function connect() {
+        ws = new WebSocket("ws://localhost:8080/ws");
+
+        ws.onopen = function () {
+          updateStatus(true);
+          logMessage("WebSocket connected");
+        };
+
+        ws.onmessage = function (event) {
+          const message = JSON.parse(event.data);
+          logMessage(`Received: ${JSON.stringify(message)}`);
+
+          if (message.type === "joined") {
+            username = message.username;
+            logMessage(`Assigned username: ${username}`);
+
+            // Draw existing strokes
+            if (message.data) {
+              message.data.forEach((stroke) => {
+                drawStroke(stroke);
+              });
+            }
+          } else if (message.type === "stroke") {
+            drawStroke(message.data);
+          } else if (message.type === "clear") {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            logMessage("Canvas cleared");
+          }
+        };
+
+        ws.onclose = function () {
+          updateStatus(false);
+          logMessage("WebSocket disconnected");
+        };
+
+        ws.onerror = function (error) {
+          logMessage(`WebSocket error: ${error}`);
+        };
+      }
+
+      function joinRoom() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          logMessage("Not connected!");
+          return;
+        }
+
+        const message = {
+          type: "join",
+          room: "hackathon-room",
+        };
+
+        ws.send(JSON.stringify(message));
+        logMessage(`Sent: ${JSON.stringify(message)}`);
+      }
+
+      function sendTestStroke() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          logMessage("Not connected!");
+          return;
+        }
+
+        const testStroke = {
+          type: "stroke",
+          room: "hackathon-room",
+          username: username,
+          data: {
+            points: [
+              [100, 100],
+              [200, 200],
+              [300, 150],
+            ],
+            color: "#ff0000",
+            thickness: 3,
+            isEraser: false,
+          },
+        };
+
+        ws.send(JSON.stringify(testStroke));
+        logMessage(`Sent test stroke: ${JSON.stringify(testStroke)}`);
+      }
+
+      function clearCanvas() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          logMessage("Not connected!");
+          return;
+        }
+
+        const message = {
+          type: "clear",
+          room: "hackathon-room",
+          username: username,
+        };
+
+        ws.send(JSON.stringify(message));
+        logMessage(`Sent: ${JSON.stringify(message)}`);
+      }
+
+      function disconnect() {
+        if (ws) {
+          ws.close();
+        }
+      }
+
+      function drawStroke(stroke) {
+        if (!stroke.points || stroke.points.length < 2) return;
+
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.thickness;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
+
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i][0], stroke.points[i][1]);
+        }
+
+        ctx.stroke();
+      }
+
+      // Canvas drawing events
+      canvas.addEventListener("mousedown", function (e) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        lastPoint = [e.clientX - rect.left, e.clientY - rect.top];
+      });
+
+      canvas.addEventListener("mousemove", function (e) {
+        if (!isDrawing || !lastPoint) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const currentPoint = [e.clientX - rect.left, e.clientY - rect.top];
+
+        // Draw locally
+        ctx.strokeStyle = "#0000ff";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        ctx.beginPath();
+        ctx.moveTo(lastPoint[0], lastPoint[1]);
+        ctx.lineTo(currentPoint[0], currentPoint[1]);
+        ctx.stroke();
+
+        // Send to server
+        const stroke = {
+          type: "stroke",
+          room: "hackathon-room",
+          username: username,
+          data: {
+            points: [lastPoint, currentPoint],
+            color: "#0000ff",
+            thickness: 2,
+            isEraser: false,
+          },
+        };
+
+        ws.send(JSON.stringify(stroke));
+
+        lastPoint = currentPoint;
+      });
+
+      canvas.addEventListener("mouseup", function () {
+        isDrawing = false;
+        lastPoint = null;
+      });
+
+      // Auto-connect on load
+      window.onload = function () {
+        connect();
+      };
+    </script>
+  </body>
+</html>
