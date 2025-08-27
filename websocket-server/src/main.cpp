@@ -25,13 +25,13 @@ struct UserData {
 
 // create a websocket approach
 struct AppState {
-    std::vector<json> stroke;
+    std::vector<json> strokes;
     std::vector<json> chat_messages;
     mutable std::shared_mutex m;
 
     void add_stroke(const json &stroke) {
         std::unique_lock lock(m);
-        chat_messages.push_back(stroke);
+        strokes.push_back(stroke);
     }
 
     void add_chat(const json &chat) {
@@ -110,6 +110,16 @@ int main() {
     dispatcher.on("user:join", [](WS *ws, const json &msg, std::string_view raw, uWS::OpCode op){
         // Broadcast user joined
         ws->publish("whiteboard", raw, op);
+    });
+    
+    dispatcher.on("stroke:erase", [&state](WS *ws, const json &msg, std::string_view raw, uWS::OpCode op){
+        const auto &payload = msg.value("payload", json::object());
+        std::cout << "Processing stroke erase from user: " << payload.value("userId", "unknown") << std::endl;
+        std::cout << "Erasing stroke at index: " << payload.value("strokeIndex", -1) << std::endl;
+        // Broadcast erase to all clients
+        std::cout << "Broadcasting stroke erase to all clients..." << std::endl;
+        ws->publish("whiteboard", raw, op);
+        std::cout << "Stroke erase broadcast complete" << std::endl;
     });
 
     auto app = uWS::App()

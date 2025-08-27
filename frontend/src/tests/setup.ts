@@ -17,7 +17,7 @@ global.WebSocket = vi.fn(() => ({
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
   readyState: WebSocket.CONNECTING,
-})) as any;
+})) as unknown as typeof WebSocket;
 
 // Mock canvas context (Windows compatible)
 const mockContext = {

@@ -10,7 +10,7 @@ interface ChatInputProps {
 export const ChatInput: React.FC<ChatInputProps> = ({ 
   onSendMessage, 
   onTyping, 
-  isTyping, 
+  _isTyping, 
   disabled = false 
 }) => {
   const [inputValue, setInputValue] = useState('');

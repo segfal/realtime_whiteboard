@@ -6,6 +6,7 @@ export type WebSocketMessageType =
   | 'stroke:point' 
   | 'stroke:finish'
   | 'stroke:add'
+  | 'stroke:erase'
   | 'chat:message'
   | 'chat:typing'
   | 'chat:sync'
@@ -50,6 +51,15 @@ export interface StrokeAddMessage extends BaseWebSocketMessage {
   };
 }
 
+export interface StrokeEraseMessage extends BaseWebSocketMessage {
+  type: 'stroke:erase';
+  payload: {
+    userId: string;
+    strokeIndex: number;
+    point: { x: number; y: number };
+  };
+}
+
 export interface ChatMessageWebSocket extends BaseWebSocketMessage {
   type: 'chat:message';
   payload: ChatPayload;
@@ -88,6 +98,7 @@ export type WebSocketMessage =
   | StrokePointMessage
   | StrokeFinishMessage
   | StrokeAddMessage
+  | StrokeEraseMessage
   | ChatMessageWebSocket
   | ChatTypingMessage
   | ChatSyncMessage

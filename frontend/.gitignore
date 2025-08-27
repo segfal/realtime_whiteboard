@@ -43,3 +43,4 @@ build/
 *.wasm
 *.wasm.map
 .vercel
+.env*.local

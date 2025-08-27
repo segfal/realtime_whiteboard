@@ -645,6 +645,18 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
             break;
           }
 
+          case "stroke:erase": {
+            if (!isLoaded || !wasmEngine) break;
+            const { strokeIndex } = message.payload;
+            console.log("Received stroke erase:", strokeIndex);
+            
+            if (strokeIndex >= 0 && strokeIndex < wasmEngine.getStrokes().length) {
+              wasmEngine.removeStroke(strokeIndex);
+              dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            }
+            break;
+          }
+
           case "chat:sync": {
             const { chatHistory } = message.payload;
             console.log("Received chat sync:", chatHistory);
@@ -953,6 +965,26 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     sendStrokeFinish,
   ]);
 
+  // Chat operations
+  const sendWebSocketMessage = useCallback(
+    (message: WebSocketMessage) => {
+      if (!state.websocket || !state.isConnected) {
+        console.warn("WebSocket not connected, cannot send message");
+        return;
+      }
+
+      try {
+        const messageString = JSON.stringify(message);
+        console.log("Sending WebSocket message:", messageString);
+        state.websocket.send(messageString);
+        console.log("WebSocket message sent successfully");
+      } catch (error) {
+        console.error("Failed to send WebSocket message:", error);
+      }
+    },
+    [state.websocket, state.isConnected]
+  );
+
   // Eraser operations
   const eraseAtPoint = useCallback(
     async (point: Point) => {
@@ -987,6 +1019,20 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
             console.log("Removing stroke:", i);
             wasmEngine.removeStroke(i);
             dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            
+            // Send erase message via WebSocket
+            const eraseMessage: WebSocketMessage = {
+              type: "stroke:erase",
+              userId: state.userId,
+              timestamp: Date.now(),
+              payload: {
+                userId: state.userId,
+                strokeIndex: i,
+                point: point,
+              },
+            };
+            console.log("Sending erase message:", eraseMessage);
+            sendWebSocketMessage(eraseMessage);
             break;
           }
         }
@@ -996,7 +1042,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         logger.error("WASM not ready yet:", err);
       }
     },
-    [isLoaded, wasmEngine, state.settings.eraserSize, wasmStrokeToReact]
+    [isLoaded, wasmEngine, state.settings.eraserSize, wasmStrokeToReact, state.userId, sendWebSocketMessage]
   );
 
   // Selection operations
@@ -1133,6 +1179,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     },
     [state.websocket, state.isConnected]
   );
+
 
   const sendChatMessage = useCallback(
     (content: string) => {
