@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWhiteboard } from "../contexts/ctx";
 import { useWASM } from "../hooks/useWasm";
 import type { Point } from "../interfaces/canvas";
-import { ToolDebugger, EventDebugger } from "../utils/debug";
+import { EventDebugger, ToolDebugger } from "../utils/debug";
 
 export const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,13 +60,13 @@ export const Canvas: React.FC = () => {
     x1: number,
     y1: number,
     x2: number,
-    y2: number,
+    y2: number
   ) => pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2;
 
   const _isPointNearStroke = (
     pt: Point,
     stroke: { points: Point[] },
-    threshold = 8,
+    threshold = 8
   ) => {
     for (let i = 0; i < stroke.points.length - 1; i++) {
       const a = stroke.points[i];
@@ -103,6 +103,9 @@ export const Canvas: React.FC = () => {
     }
 
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
+    try {
+      canvasRef.current?.setPointerCapture(e.pointerId);
+    } catch {}
     setIsDrawing(true);
 
     console.log("Pointer down:", {
@@ -185,6 +188,9 @@ export const Canvas: React.FC = () => {
 
     const mouse = { x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY };
     setIsDrawing(false);
+    try {
+      canvasRef.current?.releasePointerCapture(e.pointerId);
+    } catch {}
 
     console.log("Pointer up:", { tool: state.activeTool.id, mouse });
 
@@ -435,7 +441,7 @@ export const Canvas: React.FC = () => {
       "Drawing strokes:",
       state.strokes.length,
       "current stroke points:",
-      state.currentStroke?.points.length || 0,
+      state.currentStroke?.points.length || 0
     );
 
     // Draw all strokes (highlight selected)
@@ -471,7 +477,7 @@ export const Canvas: React.FC = () => {
       ctx.beginPath();
       ctx.moveTo(
         state.currentStroke.points[0].x,
-        state.currentStroke.points[0].y,
+        state.currentStroke.points[0].y
       );
       state.currentStroke.points.forEach((pt) => ctx.lineTo(pt.x, pt.y));
       ctx.stroke();
@@ -498,10 +504,13 @@ export const Canvas: React.FC = () => {
       ctx.lineWidth = state.splinePreview.thickness;
       ctx.setLineDash([3, 3]); // Dotted line for spline preview
       ctx.beginPath();
-      ctx.moveTo(state.splinePreview.splinePoints[0].x, state.splinePreview.splinePoints[0].y);
+      ctx.moveTo(
+        state.splinePreview.splinePoints[0].x,
+        state.splinePreview.splinePoints[0].y
+      );
       state.splinePreview.splinePoints.forEach((pt) => ctx.lineTo(pt.x, pt.y));
       ctx.stroke();
-      
+
       // Draw control points for debugging
       if (state.splinePreview.controlPoints.length > 0) {
         ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
@@ -523,7 +532,7 @@ export const Canvas: React.FC = () => {
       ctx.beginPath();
       ctx.moveTo(
         state.previewShape.points[0].x,
-        state.previewShape.points[0].y,
+        state.previewShape.points[0].y
       );
       state.previewShape.points.forEach((pt) => ctx.lineTo(pt.x, pt.y));
       ctx.stroke();
@@ -577,7 +586,7 @@ export const Canvas: React.FC = () => {
         <button
           onClick={() => {
             // Simplify selected strokes
-            state.selectedStrokes.forEach(index => {
+            state.selectedStrokes.forEach((index) => {
               simplifyStroke(index, 1.0);
             });
           }}

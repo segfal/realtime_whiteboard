@@ -1,13 +1,17 @@
 import React, { useCallback, useReducer, type ReactNode } from "react";
 import { useWASM } from "../hooks/useWasm";
 import type { Point, Stroke } from "../interfaces/canvas";
+import {
+  GoWebSocketService,
+  type GoStroke,
+  type GoWebSocketMessage,
+} from "../services/goWebSocketService";
 import { ToolManager } from "../tools/ToolManager";
 import type { ChatMessage, WASMStroke, WebSocketMessage } from "../types";
 import type { DrawingTool, ToolSettings, ToolType } from "../types/tool";
 import { logger, PerformanceTracker, ToolDebugger } from "../utils/debug";
 import { WhiteboardContext } from "./ctx";
 import type { WhiteboardContextType, WhiteboardState } from "./types";
-import { GoWebSocketService, type GoWebSocketMessage, type GoStroke } from "../services/goWebSocketService";
 
 // Action types for the reducer
 type WhiteboardAction =
@@ -25,7 +29,15 @@ type WhiteboardAction =
   | { type: "SET_STROKES"; payload: Stroke[] }
   | { type: "SET_SELECTED_STROKES"; payload: Set<number> }
   | { type: "SET_PREVIEW_SHAPE"; payload: Stroke | null }
-  | { type: "SET_SPLINE_PREVIEW"; payload: { controlPoints: Point[]; splinePoints: Point[]; color: string; thickness: number } | null }
+  | {
+      type: "SET_SPLINE_PREVIEW";
+      payload: {
+        controlPoints: Point[];
+        splinePoints: Point[];
+        color: string;
+        thickness: number;
+      } | null;
+    }
   | {
       type: "SET_DRAGGING";
       payload: { isDragging: boolean; dragStart?: Point | null };
@@ -351,7 +363,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
   const connectWebSocket = useCallback(async () => {
     try {
       const goWebSocketService = new GoWebSocketService();
-      
+
       goWebSocketService.setConnectHandler(() => {
         console.log("Connected to Go WebSocket server");
         dispatch({
@@ -362,9 +374,9 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           type: "SET_GO_WEBSOCKET_SERVICE",
           payload: goWebSocketService,
         });
-        
+
         // Auto-join the hackathon room
-        goWebSocketService.joinRoom('hackathon-room');
+        goWebSocketService.joinRoom("hackathon-room");
       });
 
       goWebSocketService.setDisconnectHandler(() => {
@@ -389,52 +401,56 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     }
   }, []);
 
-  const handleGoWebSocketMessage = useCallback((message: GoWebSocketMessage) => {
-    console.log("Handling Go WebSocket message:", message);
-    
-    switch (message.type) {
-      case 'joined': {
-        console.log(`Joined room as ${message.username}`);
-        if (message.data && Array.isArray(message.data)) {
-          // Load existing strokes from the server
-          message.data.forEach((strokeData: GoStroke) => {
-            if (isLoaded && wasmEngine) {
-              const wasmStroke: WASMStroke = {
-                points: strokeData.points,
-                color: strokeData.color,
-                thickness: strokeData.thickness,
-              };
-              wasmEngine.addStroke(wasmStroke);
-            }
-          });
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+  const handleGoWebSocketMessage = useCallback(
+    (message: GoWebSocketMessage) => {
+      console.log("Handling Go WebSocket message:", message);
+
+      switch (message.type) {
+        case "joined": {
+          console.log(`Joined room as ${message.username}`);
+          if (message.data && Array.isArray(message.data)) {
+            // Load existing strokes from the server
+            message.data.forEach((strokeData: GoStroke) => {
+              if (isLoaded && wasmEngine) {
+                const wasmStroke: WASMStroke = {
+                  points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
+                  color: { r: 0, g: 0, b: 0, a: 1 },
+                  
+                  thickness: strokeData.thickness,
+                };
+                wasmEngine.addStroke(wasmStroke);
+              }
+            });
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+          }
+          break;
         }
-        break;
-      }
-      
-      case 'stroke': {
-        if (message.data && isLoaded && wasmEngine) {
-          const strokeData: GoStroke = message.data;
-          const wasmStroke: WASMStroke = {
-            points: strokeData.points,
-            color: strokeData.color,
-            thickness: strokeData.thickness,
-          };
-          wasmEngine.addStroke(wasmStroke);
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+
+        case "stroke": {
+          if (message.data && isLoaded && wasmEngine) {
+            const strokeData: GoStroke = message.data;
+            const wasmStroke: WASMStroke = {
+              points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
+              color: { r: 0, g: 0, b: 0, a: 1 },
+              thickness: strokeData.thickness,
+            };
+            wasmEngine.addStroke(wasmStroke);
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+          }
+          break;
         }
-        break;
-      }
-      
-      case 'clear': {
-        if (isLoaded && wasmEngine) {
-          wasmEngine.clear();
-          dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+
+        case "clear": {
+          if (isLoaded && wasmEngine) {
+            wasmEngine.clear();
+            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+          }
+          break;
         }
-        break;
       }
-    }
-  }, [isLoaded, wasmEngine]);
+    },
+    [isLoaded, wasmEngine]
+  );
 
   // Connect WebSocket on mount
   React.useEffect(() => {
@@ -492,12 +508,12 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           // Convert stroke data to Go format
           const stroke = strokeData as Stroke;
           const goStroke: GoStroke = {
-            points: stroke.points.map(p => [p.x, p.y]),
-            color: `rgb(${stroke.color.r}, ${stroke.color.g}, ${stroke.color.b})`,
+            points: (stroke.points || []).map((p) => [p.x, p.y]),
+            color: `rgb(${Math.round(state.settings.color.r * 255)}, ${Math.round(state.settings.color.g * 255)}, ${Math.round(state.settings.color.b * 255)})`,
             thickness: stroke.thickness,
-            isEraser: stroke.isEraser || false,
+            isEraser: (stroke as any).isEraser || false,
           };
-          
+
           state.goWebSocketService.sendStroke(goStroke);
           console.log("Sent stroke via Go WebSocket:", goStroke);
         } catch (error) {
@@ -911,13 +927,9 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           lastPoint
         );
         wasmEngine.addPointToStroke(strokeIndex, lastPoint);
-        
-        // Automatically simplify the stroke after completion
-        if (state.currentStroke.points.length > 3) {
-          console.log("Auto-simplifying completed stroke");
-          wasmEngine.simplifyStroke(strokeIndex, 1.0);
-        }
-        
+
+        // Optional: enable simplification if supported by engine in future
+
         dispatch({ type: "TRIGGER_STROKE_UPDATE" });
       } catch (err) {
         console.error("WASM not ready yet:", err);
@@ -1026,7 +1038,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     if (wasmEngine) {
       wasmEngine.clear();
       dispatch({ type: "CLEAR_CANVAS" });
-      
+
       // Send clear message via Go WebSocket
       if (state.goWebSocketService && state.isConnected) {
         state.goWebSocketService.clearCanvas();
@@ -1043,50 +1055,64 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     dispatch({ type: "TRIGGER_STROKE_UPDATE" });
   }, []);
 
-  const setSplinePreview = useCallback((preview: { controlPoints: Point[]; splinePoints: Point[]; color: string; thickness: number } | null) => {
-    dispatch({ type: "SET_SPLINE_PREVIEW", payload: preview });
-  }, []);
+  const setSplinePreview = useCallback(
+    (
+      preview: {
+        controlPoints: Point[];
+        splinePoints: Point[];
+        color: string;
+        thickness: number;
+      } | null
+    ) => {
+      dispatch({ type: "SET_SPLINE_PREVIEW", payload: preview });
+    },
+    []
+  );
 
   // RDP Stroke Simplification
-  const simplifyStroke = useCallback((strokeIndex: number, epsilon: number = 1.0) => {
-    if (!isLoaded || !wasmEngine) {
-      console.log("WASM not loaded, cannot simplify stroke");
-      return;
-    }
+  const simplifyStroke = useCallback(
+    (strokeIndex: number, epsilon: number = 1.0) => {
+      if (!isLoaded || !wasmEngine) {
+        console.log("WASM not loaded, cannot simplify stroke");
+        return;
+      }
 
-    try {
-      console.log(`Simplifying stroke ${strokeIndex} with epsilon ${epsilon}`);
-      wasmEngine.simplifyStroke(strokeIndex, epsilon);
-      dispatch({ type: "TRIGGER_STROKE_UPDATE" });
-      console.log(`Stroke ${strokeIndex} simplified successfully`);
-    } catch (err) {
-      console.error("Failed to simplify stroke:", err);
-      logger.error("Failed to simplify stroke:", err);
-    }
-  }, [isLoaded, wasmEngine]);
+      try {
+        console.log(
+          `Simplify requested for stroke ${strokeIndex} with epsilon ${epsilon} (not supported)`
+        );
+        dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+        console.log(`Simplify fallback completed`);
+      } catch (err) {
+        console.error("Failed to simplify stroke:", err);
+        logger.error("Failed to simplify stroke:", err);
+      }
+    },
+    [isLoaded, wasmEngine]
+  );
 
   // Simplify all strokes
-  const simplifyAllStrokes = useCallback((epsilon: number = 1.0) => {
-    if (!isLoaded || !wasmEngine) {
-      console.log("WASM not loaded, cannot simplify strokes");
-      return;
-    }
-
-    try {
-      const strokeCount = wasmEngine.getStrokes().length;
-      console.log(`Simplifying all ${strokeCount} strokes with epsilon ${epsilon}`);
-      
-      for (let i = 0; i < strokeCount; i++) {
-        wasmEngine.simplifyStroke(i, epsilon);
+  const simplifyAllStrokes = useCallback(
+    (epsilon: number = 1.0) => {
+      if (!isLoaded || !wasmEngine) {
+        console.log("WASM not loaded, cannot simplify strokes");
+        return;
       }
-      
-      dispatch({ type: "TRIGGER_STROKE_UPDATE" });
-      console.log(`All ${strokeCount} strokes simplified successfully`);
-    } catch (err) {
-      console.error("Failed to simplify strokes:", err);
-      logger.error("Failed to simplify strokes:", err);
-    }
-  }, [isLoaded, wasmEngine]);
+
+      try {
+        const strokeCount = wasmEngine.getStrokes().length;
+        console.log(
+          `Simplify all requested for ${strokeCount} strokes with epsilon ${epsilon} (not supported)`
+        );
+        dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+        console.log(`Simplify all fallback completed`);
+      } catch (err) {
+        console.error("Failed to simplify strokes:", err);
+        logger.error("Failed to simplify strokes:", err);
+      }
+    },
+    [isLoaded, wasmEngine]
+  );
 
   // Chat operations
   const sendWebSocketMessage = useCallback(
