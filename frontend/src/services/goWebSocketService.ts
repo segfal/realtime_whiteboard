@@ -4,13 +4,8 @@ export interface GoWebSocketMessage {
   username?: string;
   data?: any;
 }
-// TODO: Look for Socket issues
-/**
- * Problem: 
- * Socket is not loading and not syncing
- * Find the issue
- */
 export interface GoStroke {
+  id?: string;
   points: [number, number][];
   color: string;
   thickness: number;
@@ -32,7 +27,6 @@ export class GoWebSocketService {
       this.ws = new WebSocket(this.serverUrl);
 
       this.ws.onopen = () => {
-
         console.log("Connected to Go WebSocket server");
         this.onConnect?.();
         resolve();
@@ -99,7 +93,7 @@ export class GoWebSocketService {
       type: "chat:message",
       room: this.room,
       username: this.username || "unknown",
-      data: { message: messageText, timestamp: new Date().toISOString() },
+      data: { content: messageText, timestamp: new Date().toISOString() },
     };
     this.send(message);
   }

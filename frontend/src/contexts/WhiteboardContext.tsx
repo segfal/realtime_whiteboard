@@ -298,6 +298,9 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
 }) => {
   const [state, dispatch] = useReducer(whiteboardReducer, initialState);
   const { drawingEngine: wasmEngine, isLoaded, error } = useWASM();
+  const [pendingStrokes, setPendingStrokes] = React.useState<
+    GoWebSocketMessage[]
+  >([]);
 
   // Initialize tool manager
   const [toolManager] = React.useState(() => new ToolManager());
@@ -330,6 +333,26 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     }
   }, [state.allTools.length, toolManager]);
 
+  // Process pending strokes when WASM becomes loaded
+  React.useEffect(() => {
+    if (isLoaded && wasmEngine && pendingStrokes.length > 0) {
+      console.log(`Processing ${pendingStrokes.length} pending strokes...`);
+      pendingStrokes.forEach((message) => {
+        if (message.type === "stroke" && message.data) {
+          const strokeData: GoStroke = message.data;
+          const wasmStroke: WASMStroke = {
+            points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
+            color: parseRgbString(strokeData.color),
+            thickness: strokeData.thickness,
+          };
+          wasmEngine.addStroke(wasmStroke);
+        }
+      });
+      setPendingStrokes([]);
+      dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+    }
+  }, [isLoaded, wasmEngine, pendingStrokes]);
+
   // Update WASM state
   React.useEffect(() => {
     dispatch({ type: "SET_WASM_LOADED", payload: isLoaded });
@@ -358,6 +381,30 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       thickness: wasmStroke.thickness || 1,
     };
   }, []);
+
+  // Utility function to convert RGB string to WASM color format
+  const parseRgbString = (rgbString: string): WASMColor => {
+    console.log("Parsing RGB string:", rgbString);
+    // Handle different RGB formats: "rgb(255, 0, 0)", "rgba(255, 0, 0, 1)", etc.
+    const match = rgbString.match(
+      /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/
+    );
+    if (match) {
+      const [, r, g, b, a = "1"] = match;
+      const color = {
+        r: parseInt(r) / 255,
+        g: parseInt(g) / 255,
+        b: parseInt(b) / 255,
+        a: parseFloat(a),
+      };
+      console.log("Parsed color:", color);
+      return color;
+    }
+
+    // Fallback to black if parsing fails
+    console.warn(`Failed to parse color: ${rgbString}, using black`);
+    return { r: 0, g: 0, b: 0, a: 1 };
+  };
 
   // WebSocket connection function
   const connectWebSocket = useCallback(async () => {
@@ -403,7 +450,9 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
 
   const handleGoWebSocketMessage = useCallback(
     (message: GoWebSocketMessage) => {
-      console.log("Handling Go WebSocket message:", message);
+      console.log("=== HANDLING GO WEBSOCKET MESSAGE ===");
+      console.log("Message type:", message.type);
+      console.log("Full message:", message);
 
       switch (message.type) {
         case "joined": {
@@ -414,8 +463,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
               if (isLoaded && wasmEngine) {
                 const wasmStroke: WASMStroke = {
                   points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
-                  color: { r: 0, g: 0, b: 0, a: 1 },
-                  
+                  color: parseRgbString(strokeData.color),
                   thickness: strokeData.thickness,
                 };
                 wasmEngine.addStroke(wasmStroke);
@@ -427,15 +475,56 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         }
 
         case "stroke": {
-          if (message.data && isLoaded && wasmEngine) {
+          console.log("Processing stroke message:", message);
+          console.log("Stroke processing conditions:", {
+            hasData: !!message.data,
+            isLoaded,
+            hasWasmEngine: !!wasmEngine,
+            messageData: message.data,
+          });
+
+          if (message.data) {
+            // Temporarily disable username check to debug
+            // const currentUsername = state.goWebSocketService?.getUsername();
+            // console.log("Username comparison:", {
+            //   messageUsername: message.username,
+            //   currentUsername: currentUsername,
+            //   isSameUser: message.username === currentUsername
+            // });
+            // if (message.username === currentUsername) {
+            //   console.log("Ignoring stroke from same user:", message.username);
+            //   break;
+            // }
+
             const strokeData: GoStroke = message.data;
-            const wasmStroke: WASMStroke = {
-              points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
-              color: { r: 0, g: 0, b: 0, a: 1 },
-              thickness: strokeData.thickness,
-            };
-            wasmEngine.addStroke(wasmStroke);
-            dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            console.log("Received stroke from server:", strokeData);
+            console.log("Stroke data type:", typeof strokeData);
+            console.log("Stroke data keys:", Object.keys(strokeData));
+            console.log("Stroke points:", strokeData.points);
+            console.log("Stroke color:", strokeData.color);
+            console.log("Stroke thickness:", strokeData.thickness);
+
+            if (isLoaded && wasmEngine) {
+              // Process stroke immediately if WASM is loaded
+              const wasmStroke: WASMStroke = {
+                points: (strokeData.points || []).map(([x, y]) => ({ x, y })),
+                color: parseRgbString(strokeData.color),
+                thickness: strokeData.thickness,
+              };
+              console.log("Converted to WASM stroke:", wasmStroke);
+              console.log("Adding stroke to WASM engine...");
+              wasmEngine.addStroke(wasmStroke);
+              console.log("Stroke added to WASM, triggering update");
+              dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+            } else {
+              // Queue stroke for later processing when WASM loads
+              console.log(
+                "WASM not loaded, queuing stroke for later processing"
+              );
+              setPendingStrokes((prev) => [...prev, message]);
+            }
+          } else {
+            console.log("Cannot process stroke: no data");
           }
           break;
         }
@@ -444,6 +533,44 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
           if (isLoaded && wasmEngine) {
             wasmEngine.clear();
             dispatch({ type: "TRIGGER_STROKE_UPDATE" });
+          }
+          break;
+        }
+
+        case "chat:message": {
+          if (message.data) {
+            console.log("Raw chat message data:", message.data);
+
+            // Use a more stable ID to prevent duplicates
+            const messageId = message.data.id || crypto.randomUUID();
+            const existingMessage = state.chat.messages.find(
+              (msg) =>
+                msg.content ===
+                  (message.data.content || message.data.message) &&
+                msg.username === message.username &&
+                Math.abs(
+                  msg.timestamp - (message.data.timestamp || Date.now())
+                ) < 1000 // Within 1 second
+            );
+
+            if (existingMessage) {
+              console.log(
+                "Duplicate chat message detected, skipping:",
+                message.data
+              );
+              break;
+            }
+
+            const chatMessage: ChatMessage = {
+              id: messageId,
+              userId: message.username || "unknown",
+              username: message.username || "unknown",
+              content: message.data.content || message.data.message || "",
+              timestamp: message.data.timestamp || Date.now(),
+              type: "text", // Add the required type field
+            };
+            dispatch({ type: "ADD_CHAT_MESSAGE", payload: chatMessage });
+            console.log("Processed chat message:", chatMessage);
           }
           break;
         }
@@ -503,17 +630,26 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
 
   const sendStrokeViaWebSocket = useCallback(
     (strokeData: unknown) => {
+      console.log("sendStrokeViaWebSocket called with:", strokeData);
+      console.log("WebSocket state:", {
+        hasService: !!state.goWebSocketService,
+        isConnected: state.isConnected,
+        serviceConnected: state.goWebSocketService?.isConnected(),
+      });
+
       if (state.goWebSocketService && state.isConnected) {
         try {
           // Convert stroke data to Go format
           const stroke = strokeData as Stroke;
           const goStroke: GoStroke = {
+            id: (stroke as any).id, // Include the stroke ID
             points: (stroke.points || []).map((p) => [p.x, p.y]),
             color: `rgb(${Math.round(state.settings.color.r * 255)}, ${Math.round(state.settings.color.g * 255)}, ${Math.round(state.settings.color.b * 255)})`,
             thickness: stroke.thickness,
             isEraser: (stroke as any).isEraser || false,
           };
 
+          console.log("Sending stroke to server:", goStroke);
           state.goWebSocketService.sendStroke(goStroke);
           console.log("Sent stroke via Go WebSocket:", goStroke);
         } catch (error) {
@@ -521,9 +657,14 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
         }
       } else {
         console.log("Go WebSocket not connected, cannot send stroke");
+        console.log("Connection details:", {
+          goWebSocketService: !!state.goWebSocketService,
+          isConnected: state.isConnected,
+          serviceConnected: state.goWebSocketService?.isConnected(),
+        });
       }
     },
-    [state.goWebSocketService, state.isConnected]
+    [state.goWebSocketService, state.isConnected, state.settings.color]
   );
 
   // New message types for real-time drawing
@@ -885,16 +1026,29 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       }
 
       // Update React state for immediate feedback
+      const updatedStroke = {
+        points: [...state.currentStroke.points, point],
+        color: state.currentStroke.color,
+        thickness: state.currentStroke.thickness,
+      };
+
       dispatch({
         type: "SET_CURRENT_STROKE",
-        payload: {
-          points: [...state.currentStroke.points, point],
-          color: state.currentStroke.color,
-          thickness: state.currentStroke.thickness,
-        },
+        payload: updatedStroke,
       });
 
-      // Send point update via WebSocket
+      // Send real-time stroke update via WebSocket (every few points to avoid spam)
+      if (updatedStroke.points.length % 3 === 0) {
+        // Send every 3rd point for smoother real-time
+        const strokeWithId = {
+          ...updatedStroke,
+          id: state.currentStrokeId || crypto.randomUUID(),
+        };
+        console.log("Sending real-time stroke update:", strokeWithId);
+        sendStrokeViaWebSocket(strokeWithId);
+      }
+
+      // Send point update via WebSocket (legacy)
       if (state.currentStrokeId) {
         sendStrokePoint(state.currentStrokeId, point);
       }
@@ -905,6 +1059,7 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       state.currentStroke,
       state.currentStrokeId,
       sendStrokePoint,
+      sendStrokeViaWebSocket,
     ]
   );
 
@@ -913,28 +1068,44 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
       "finishDrawing called, current stroke points:",
       state.currentStroke?.points.length || 0
     );
-    if (state.currentStroke && state.currentStroke.points.length > 0) {
-      try {
-        // Ensure the last point is added to the WASM stroke
-        const wasmStrokes = wasmEngine.getStrokes();
-        const strokeIndex = wasmStrokes.length - 1;
-        const lastPoint =
-          state.currentStroke.points[state.currentStroke.points.length - 1];
-        console.log(
-          "Finishing stroke, adding last point to WASM stroke index:",
-          strokeIndex,
-          "point:",
-          lastPoint
-        );
-        wasmEngine.addPointToStroke(strokeIndex, lastPoint);
+    console.log("Current stroke data:", state.currentStroke);
 
-        // Optional: enable simplification if supported by engine in future
+    // Get the latest stroke from WASM as fallback
+    const wasmStrokes = wasmEngine.getStrokes();
+    const latestWasmStroke = wasmStrokes[wasmStrokes.length - 1];
+    console.log("Latest WASM stroke:", latestWasmStroke);
+
+    // Use React state stroke if available, otherwise use WASM stroke
+    let strokeToSend = state.currentStroke;
+    if (!strokeToSend || strokeToSend.points.length === 0) {
+      if (latestWasmStroke) {
+        strokeToSend = wasmStrokeToReact(latestWasmStroke);
+        console.log("Using WASM stroke as fallback:", strokeToSend);
+      }
+    }
+
+    if (strokeToSend && strokeToSend.points.length > 0) {
+      try {
+        // Add stroke ID for tracking
+        const strokeWithId = {
+          ...strokeToSend,
+          id: state.currentStrokeId || crypto.randomUUID(),
+        };
+
+        // Send stroke to other users via WebSocket
+        console.log(
+          "Sending stroke to server for real-time sync:",
+          strokeWithId
+        );
+        sendStrokeViaWebSocket(strokeWithId);
 
         dispatch({ type: "TRIGGER_STROKE_UPDATE" });
       } catch (err) {
-        console.error("WASM not ready yet:", err);
-        logger.error("WASM not ready yet:", err);
+        console.error("Failed to send stroke via WebSocket:", err);
+        logger.error("Failed to send stroke via WebSocket:", err);
       }
+    } else {
+      console.warn("No valid stroke to send");
     }
 
     // Send stroke finish via WebSocket
@@ -951,6 +1122,8 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     wasmEngine,
     state.currentStrokeId,
     sendStrokeFinish,
+    sendStrokeViaWebSocket,
+    wasmStrokeToReact,
   ]);
 
   // Eraser operations
@@ -1138,22 +1311,15 @@ export const WhiteboardProvider: React.FC<WhiteboardProviderProps> = ({
     (content: string) => {
       if (!content.trim()) return;
 
-      const message: WebSocketMessage = {
-        type: "chat:message",
-        userId: state.userId,
-        timestamp: Date.now(),
-        payload: {
-          userId: state.userId,
-          username: `User ${state.userId.slice(0, 8)}`,
-          content: content.trim(),
-          timestamp: Date.now(),
-        },
-      };
-
-      console.log("Sending chat message:", JSON.stringify(message, null, 2));
-      sendWebSocketMessage(message);
+      if (state.goWebSocketService && state.isConnected) {
+        // Use the Go WebSocket service
+        state.goWebSocketService.sendChat(content.trim());
+        console.log("Sent chat message via Go WebSocket:", content.trim());
+      } else {
+        console.warn("Go WebSocket not connected, cannot send chat message");
+      }
     },
-    [state.userId, sendWebSocketMessage]
+    [state.goWebSocketService, state.isConnected]
   );
 
   const sendTypingStatus = useCallback(
