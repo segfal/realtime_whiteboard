@@ -1,0 +1,13 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "python api/main.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+numReplicas = 1
+
+[deploy.envs]
+PORT = "8000"
+CORS_ORIGIN = "https://your-vercel-app.vercel.app"

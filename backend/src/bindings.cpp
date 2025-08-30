@@ -30,7 +30,8 @@ EMSCRIPTEN_BINDINGS(drawing_module) {
         .constructor<const Color&, float, const std::vector<Point>&>()
         .property("points", &StrokeShape::points)
         .function("getColor", &StrokeShape::getColor)
-        .function("getThickness", &StrokeShape::getThickness);
+        .function("getThickness", &StrokeShape::getThickness)
+        .function("simplify", &StrokeShape::simplify);
 
     // Binding stroke and point vectors
     register_vector<Point>("PointVector");
@@ -48,5 +49,6 @@ EMSCRIPTEN_BINDINGS(drawing_module) {
         .function("moveStroke", &DrawingEngine::moveStroke)
         .function("clear", &DrawingEngine::clear)
         .function("getStrokes", &DrawingEngine::getStrokes)
-        .function("getVertexBufferData", &DrawingEngine::getVertexBufferData);
+        .function("getVertexBufferData", &DrawingEngine::getVertexBufferData)
+        .function("simplifyStroke", &DrawingEngine::simplifyStroke);
 }

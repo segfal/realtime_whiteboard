@@ -137,3 +137,21 @@ std::vector<float> DrawingEngine::getVertexBufferData() const {
     
     return data;
 }
+
+
+
+void DrawingEngine::simplifyStroke(int index, float epsilon) {
+    int strokeCount = 0;
+    for (auto& shape : shapes) {
+        if (shape->type == ShapeType::Stroke) {
+            if (strokeCount == index) {
+                StrokeShape* strokeShape = dynamic_cast<StrokeShape*>(shape.get());
+                if (strokeShape) {
+                    strokeShape->simplify(epsilon);
+                }
+                return;
+            }
+            strokeCount++;
+        }
+    }
+}

@@ -1,8 +1,0 @@
-{
-  "payload": {
-    "room_id": "cpp-test-room",
-    "user_key": "cpp_test_user",
-    "username": "CppTestClient"
-  },
-  "type": "room:join"
-}

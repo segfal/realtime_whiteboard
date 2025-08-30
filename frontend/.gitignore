@@ -32,3 +32,15 @@ docs/
 debug-logs/
 debug-session.json
 scripts/
+
+# WASM build artifacts
+public/drawing_engine.js
+public/drawing_engine.wasm
+public/drawing_engine.wasm.map
+
+# Build artifacts
+build/
+*.wasm
+*.wasm.map
+.vercel
+.env*.local
