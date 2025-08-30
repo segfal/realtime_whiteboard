@@ -26,6 +26,9 @@ class DrawingEngine {
         
         // WebGPU vertex data
         std::vector<float> getVertexBufferData() const;
+
+        // simplify with RDP
+        void simplifyStroke(int index, float epsilon = 1.0f);
     
     private:
         std::vector<std::unique_ptr<Shape>> shapes;

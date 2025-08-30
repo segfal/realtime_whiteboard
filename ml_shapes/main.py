@@ -1,158 +1,248 @@
+import argparse
+import os
+import json
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-import numpy as np
-import random
-import cv2
+from torchvision import transforms
 import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image, ImageDraw
+import torch.nn.functional as F
 
-def draw_shape(shape, size=32):
-    img = np.zeros((size, size), dtype=np.uint8)
-    color = 255  # white color
-    thickness = random.choice([-1, 2])  # filled or outline thickness=2
 
-    scale = random.uniform(0.6, 1.0)
-    max_dim = int(size * scale)
+# ---------------- Dataset ---------------- #
+class QuickDrawDataset(Dataset):
+    def __init__(self, files, label_map, img_size=64, limit_per_class=5000, transform=None):
+        self.data = []
+        self.labels = []
+        self.label_map = label_map
+        self.img_size = img_size
+        self.transform = transform
 
-    max_offset = size - max_dim
-    offset_x = random.randint(0, max_offset)
-    offset_y = random.randint(0, max_offset)
+        for file in files:
+            # Use the shortened label by removing the "full_raw_" prefix
+            label = os.path.splitext(os.path.basename(file))[0].replace("full_raw_", "")
+            if label not in label_map:
+                continue
 
-    if shape == "circle":
-        center = (offset_x + max_dim // 2, offset_y + max_dim // 2)
-        radius = max_dim // 2
-        cv2.circle(img, center, radius, color, thickness)
+            with open(file, "r") as f:
+                lines = f.readlines()
+                random.shuffle(lines)
+                lines = lines[:limit_per_class]
 
-    elif shape == "square":
-        pts = np.array([
-            [0, 0],
-            [max_dim, 0],
-            [max_dim, max_dim],
-            [0, max_dim]
-        ], dtype=np.int32)
-
-        angle = random.uniform(-30, 30)
-        center_pt = (max_dim // 2, max_dim // 2)
-        M = cv2.getRotationMatrix2D(center_pt, angle, 1.0)
-        pts = np.array([np.dot(M, np.append(p, 1)) for p in pts], dtype=np.int32)
-
-        pts += np.array([offset_x, offset_y])
-        pts = pts.reshape((-1, 1, 2))
-
-        if thickness == -1:
-            cv2.fillPoly(img, [pts], color=color)
-        else:
-            cv2.polylines(img, [pts], isClosed=True, color=color, thickness=thickness)
-
-    elif shape == "triangle":
-        height = int(max_dim * (3 ** 0.5) / 2)
-        pts = np.array([
-            [max_dim // 2, 0],
-            [0, height],
-            [max_dim, height]
-        ], dtype=np.int32)
-
-        angle = random.uniform(-30, 30)
-        center_pt = (max_dim // 2, height // 2)
-        M = cv2.getRotationMatrix2D(center_pt, angle, 1.0)
-        pts = np.array([np.dot(M, np.append(p, 1)) for p in pts], dtype=np.int32)
-
-        pts += np.array([offset_x, offset_y])
-        pts = pts.reshape((-1, 1, 2))
-
-        if thickness == -1:
-            cv2.fillPoly(img, [pts], color=color)
-        else:
-            cv2.polylines(img, [pts], isClosed=True, color=color, thickness=thickness)
-
-    return img
-
-class ShapeDataset(Dataset):
-    def __init__(self, num_samples=3000, image_size=32):
-        self.shapes = ["circle", "square", "triangle"]
-        self.num_samples = num_samples
-        self.image_size = image_size
+                for line in lines:
+                    drawing = json.loads(line)["drawing"]
+                    self.data.append(drawing)
+                    self.labels.append(label_map[label])
 
     def __len__(self):
-        return self.num_samples
+        return len(self.data)
 
     def __getitem__(self, idx):
-        shape = random.choice(self.shapes)
-        img = draw_shape(shape, size=self.image_size)
-        img = img.astype(np.float32) / 255.0
-        img = torch.tensor(img).unsqueeze(0)
-        label = self.shapes.index(shape)
-        return img, label
+        drawing = self.data[idx]
+        img = self.render_drawing(drawing)
 
-class ShapeCNN(nn.Module):
-    def __init__(self, num_classes=3):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 16, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 3, padding=1)
-        self.fc1 = nn.Linear(32 * 8 * 8, 64)
-        self.fc2 = nn.Linear(64, num_classes)
+        if self.transform:
+            img = self.transform(img)
+
+        return img, self.labels[idx]
+
+    def render_drawing(self, drawing):
+        img = Image.new("L", (self.img_size, self.img_size), 0)
+        draw = ImageDraw.Draw(img)
+
+        all_x, all_y = [], []
+        for stroke in drawing:
+            all_x.extend(stroke[0])
+            all_y.extend(stroke[1])
+
+        if not all_x or not all_y:
+            return img
+
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+
+        scale = min(self.img_size / (max_x - min_x + 1),
+                    self.img_size / (max_y - min_y + 1)) * 0.9
+        offset_x = (self.img_size - (max_x - min_x) * scale) / 2
+        offset_y = (self.img_size - (max_y - min_y) * scale) / 2
+
+        line_width = random.randint(2, 4)
+
+        for stroke in drawing:
+            points = [(int((x - min_x) * scale + offset_x),
+                         int((y - min_y) * scale + offset_y)) for x, y in zip(stroke[0], stroke[1])]
+            if len(points) > 1:
+                draw.line(points, fill=255, width=line_width)
+
+        return img
+
+
+# ---------------- Model ---------------- #
+class SimpleCNN(nn.Module):
+    def __init__(self, num_classes):
+        super(SimpleCNN, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(128 * 8 * 8, 256), nn.ReLU(),
+            nn.Linear(256, num_classes)
+        )
 
     def forward(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
-        x = x.view(-1, 32 * 8 * 8)
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
+        x = self.conv(x)
+        x = x.view(x.size(0), -1)
+        return self.fc(x)
 
-def train(model, dataloader, device, epochs=10):
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    model.to(device)
+# ---------------- Training ---------------- #
+def train_model(model, dataloader, criterion, optimizer, device, epochs, save_every, label_map, save_path="model.pth"):
     model.train()
-
     for epoch in range(epochs):
-        running_loss = 0.0
+        total_loss = 0
         for imgs, labels in dataloader:
             imgs, labels = imgs.to(device), labels.to(device)
-
             optimizer.zero_grad()
             outputs = model(imgs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            total_loss += loss.item()
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(dataloader):.4f}")
 
-            running_loss += loss.item()
+        if (epoch + 1) % save_every == 0:
+            checkpoint = {
+                "model_state": model.state_dict(),
+                "label_map": label_map
+            }
+            torch.save(checkpoint, save_path)
+            print(f"Model saved at {save_path}")
 
-        print(f"Epoch {epoch+1}/{epochs} - Loss: {running_loss / len(dataloader):.4f}")
 
-def visualize_predictions(model, device, num_samples=5):
-    model.eval()
-    shapes = ["circle", "square", "triangle"]
-    fig, axs = plt.subplots(1, num_samples, figsize=(num_samples * 3, 3))
+# ---------------- Visualization ---------------- #
+def visualize_dataset(dataset, label_map, n=25):
+    indices = random.sample(range(len(dataset)), n)
+    imgs, labels = zip(*[dataset[i] for i in indices])
 
-    with torch.no_grad():
-        for i in range(num_samples):
-            shape = random.choice(shapes)
-            img = draw_shape(shape, size=32)
-            img_norm = img.astype(np.float32) / 255.0
-            tensor_img = torch.tensor(img_norm).unsqueeze(0).unsqueeze(0).to(device)
-
-            output = model(tensor_img)
-            pred_idx = torch.argmax(output, dim=1).item()
-            pred_shape = shapes[pred_idx]
-
-            axs[i].imshow(img, cmap='gray')
-            axs[i].set_title(f"True: {shape}\nPred: {pred_shape}")
-            axs[i].axis('off')
-
+    inv_label_map = {v: k for k, v in label_map.items()}
+    imgs = [img.squeeze().numpy() for img in imgs]
+    fig, axes = plt.subplots(5, 5, figsize=(8, 8))
+    for ax, img, lbl in zip(axes.flatten(), imgs, labels):
+        ax.imshow(img, cmap="gray")
+        ax.set_title(inv_label_map[lbl])
+        ax.axis("off")
     plt.show()
 
-if __name__ == "__main__":
-    dataset = ShapeDataset(num_samples=1000)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+def visualize_prediction(img, pred, confidence, inv_label_map):
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.imshow(img, cmap="gray")
+    ax.set_title(f"Predicted: {inv_label_map[pred]} ({confidence.item():.2%})", fontsize=12)
+    ax.axis("off")
+    plt.show()
+
+
+# ---------------- Prediction ---------------- #
+def predict_image(model, img_path, transform, label_map, device):
+    img = Image.open(img_path).convert("L").resize((64, 64))
+
+    img_array = np.array(img)
+
+    if img_array.mean() > 127.5:
+        img_array = 255 - img_array
+    
+    img = Image.fromarray(img_array.astype(np.uint8))
+    
+    preprocessed_img = img.copy()
+
+    img = transform(img).unsqueeze(0).to(device)
+
+    model.eval()
+    with torch.no_grad():
+        outputs = model(img)
+        
+        probabilities = F.softmax(outputs, dim=1)
+        
+        confidence, pred = torch.max(probabilities, 1)
+
+    inv_label_map = {v: k for k, v in label_map.items()}
+    
+    return preprocessed_img, pred.item(), confidence, inv_label_map
+
+
+# ---------------- Main ---------------- #
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train_path", type=str, help="Path to folder with .ndjson files")
+    parser.add_argument("--predict", type=str, help="Path to image for prediction")
+    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--img_size", type=int, default=64)
+    parser.add_argument("--save_every", type=int, default=5)
+    parser.add_argument("--visualize", action="store_true", help="Visualize the dataset or prediction")
+    parser.add_argument("--model_path", type=str, default="model.pth")
+    args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ShapeCNN(num_classes=3)
 
-    train(model, dataloader, device)
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
 
-    visualize_predictions(model, device)
+    # ---------------- Training ---------------- #
+    if args.train_path:
+        files = [os.path.join(args.train_path, f) for f in os.listdir(args.train_path) if f.endswith(".ndjson")]
+        # Create a shortened label map
+        label_map = {os.path.splitext(os.path.basename(f))[0].replace("full_raw_", ""): i for i, f in enumerate(files)}
+
+        dataset = QuickDrawDataset(files, label_map, img_size=args.img_size, transform=transform)
+        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+
+        if args.visualize:
+            visualize_dataset(dataset, label_map)
+            return
+
+        # Resume if model exists
+        if os.path.exists(args.model_path):
+            checkpoint = torch.load(args.model_path, map_location=device)
+            old_label_map = checkpoint["label_map"]
+            model = SimpleCNN(num_classes=len(old_label_map)).to(device)
+            model.load_state_dict(checkpoint["model_state"])
+            print("Resumed training from saved model.")
+        else:
+            model = SimpleCNN(num_classes=len(label_map)).to(device)
+            print("Training new model from scratch.")
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+        train_model(model, dataloader, criterion, optimizer, device, args.epochs, args.save_every, label_map, args.model_path)
+
+    # ---------------- Prediction ---------------- #
+    elif args.predict:
+        if not os.path.exists(args.model_path):
+            print(f"Error: Model file '{args.model_path}' not found. Please train a model first.")
+            return
+
+        checkpoint = torch.load(args.model_path, map_location=device)
+        label_map = checkpoint["label_map"]
+
+        model = SimpleCNN(num_classes=len(label_map)).to(device)
+        model.load_state_dict(checkpoint["model_state"])
+
+        preprocessed_img, pred_idx, confidence, inv_label_map = predict_image(model, args.predict, transform, label_map, device)
+
+        print(f"Prediction: {inv_label_map[pred_idx]} | Confidence: {confidence.item():.2%}")
+
+        if args.visualize:
+            visualize_prediction(preprocessed_img, pred_idx, confidence, inv_label_map)
+
+
+if __name__ == "__main__":
+    main()

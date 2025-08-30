@@ -1,0 +1,84 @@
+{
+  "version": "1.0.0",
+  "description": "WebSocket protocol for realtime whiteboard",
+  "messages": {
+    "stroke:start": {
+      "description": "Start a new stroke",
+      "payload": {
+        "strokeId": "string",
+        "color": {
+          "r": "number",
+          "g": "number", 
+          "b": "number",
+          "a": "number"
+        },
+        "thickness": "number",
+        "userId": "string",
+        "timestamp": "number"
+      }
+    },
+    "stroke:point": {
+      "description": "Add a point to an existing stroke",
+      "payload": {
+        "strokeId": "string",
+        "point": {
+          "x": "number",
+          "y": "number"
+        },
+        "userId": "string",
+        "timestamp": "number"
+      }
+    },
+    "stroke:finish": {
+      "description": "Finish a stroke",
+      "payload": {
+        "strokeId": "string",
+        "userId": "string",
+        "timestamp": "number"
+      }
+    },
+    "stroke:add": {
+      "description": "Add a complete stroke (legacy)",
+      "payload": {
+        "stroke": {
+          "points": "Point[]",
+          "color": "Color",
+          "thickness": "number"
+        },
+        "userId": "string",
+        "timestamp": "number"
+      }
+    },
+    "chat:message": {
+      "description": "Send a chat message",
+      "payload": {
+        "user": "string",
+        "message": "string",
+        "timestamp": "string"
+      }
+    },
+    "user:join": {
+      "description": "User joins the room",
+      "payload": {
+        "userId": "string",
+        "username": "string",
+        "timestamp": "number"
+      }
+    },
+    "sync:request": {
+      "description": "Request current state sync",
+      "payload": {
+        "userId": "string",
+        "timestamp": "number"
+      }
+    },
+    "sync:response": {
+      "description": "Response with current state",
+      "payload": {
+        "strokes": "Stroke[]",
+        "users": "string[]",
+        "timestamp": "number"
+      }
+    }
+  }
+}
